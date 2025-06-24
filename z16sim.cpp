@@ -51,20 +51,81 @@ z16sim::z16sim() {
 void z16sim::disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize) {
     uint8_t opcode = inst & 0x7;
     switch(opcode) {
-        case 0x0: { // R-type: [15:12] funct4 | [11:9] rs2 | [8:6] rd/rs1 | [5:3] funct3 | [2:0] opcode
+        case 0x0: { // R-type
             uint8_t funct4 = (inst >> 12) & 0xF;
             uint8_t rs2     = (inst >> 9) & 0x7;
             uint8_t rd_rs1  = (inst >> 6) & 0x7;
             uint8_t funct3  = (inst >> 3) & 0x7;
+
             if(funct4 == 0x0 && funct3 == 0x0)
-                printf("add %s, %s", regNames[rd_rs1], regNames[rs2]);
-            // complete the rest
+                snprintf(buf, bufSize, "add %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if(funct4 == 0x1 && funct3 == 0x0)
+                snprintf(buf, bufSize, "sub %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if(funct4 == 0x2 && funct3 == 0x1)
+                snprintf(buf, bufSize, "slt %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if(funct4 == 0x3 && funct3 == 0x2)
+                snprintf(buf, bufSize, "sltu %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if(funct4 == 0x4 && funct3 == 0x3)
+                snprintf(buf, bufSize, "sll %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if(funct4 == 0x5 && funct3 == 0x3)
+                snprintf(buf, bufSize, "srl %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if(funct4 == 0x6 && funct3 == 0x3)
+                snprintf(buf, bufSize, "sra %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if(funct4 == 0x7 && funct3 == 0x4)
+                snprintf(buf, bufSize, "or %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if(funct4 == 0x8 && funct3 == 0x5)
+                snprintf(buf, bufSize, "and %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if(funct4 == 0x9 && funct3 == 0x6)
+                snprintf(buf, bufSize, "xor %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if(funct4 == 0xA && funct3 == 0x7)
+                snprintf(buf, bufSize, "mv %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if(funct4 == 0xB && funct3 == 0x0)
+                snprintf(buf, bufSize, "jr %s", regNames[rd_rs1]); // usually only one register (PC <- rs1)
+            else if(funct4 == 0xC && funct3 == 0x0)
+                snprintf(buf, bufSize, "jalr %s", regNames[rd_rs1]);
+            else
+                snprintf(buf, bufSize, "unknown R-type");
+
             break;
         }
         case 0x1: { // I-type: [15:9] imm[6:0] | [8:6] rd/rs1 | [5:3] funct3 | [2:0] opcode
-            // your code goes here
+            int16_t imm = (inst >> 9) & 0x7F;
+            uint8_t rd_rs1 = (inst >> 6) & 0x7;
+            uint8_t funct3 = (inst >> 3) & 0x7;
+
+            if (funct3 == 0x0)
+                printf("addi %s, %d\n", regNames[rd_rs1], imm);
+            else if (funct3 == 0x1)
+                printf("slti %s, %d\n", regNames[rd_rs1], imm);
+            else if (funct3 == 0x2)
+                printf("sltui %s, %d\n", regNames[rd_rs1], imm);
+            else if (funct3 == 0x3) {
+                // Shift immediate instructions
+                uint8_t shamt = imm & 0xF;
+                uint8_t shift_type = (imm >> 4) & 0x7;
+                if (shift_type == 0x1)
+                    printf("slli %s, %d\n", regNames[rd_rs1], shamt);
+                else if (shift_type == 0x2)
+                    printf("srli %s, %d\n", regNames[rd_rs1], shamt);
+                else if (shift_type == 0x4)
+                    printf("srai %s, %d\n", regNames[rd_rs1], shamt);
+                else
+                    printf("unknown shift instruction (funct3 = 0x3)\n");
+            }
+            else if (funct3 == 0x4)
+                printf("ori %s, %d\n", regNames[rd_rs1], imm);
+            else if (funct3 == 0x5)
+                printf("andi %s, %d\n", regNames[rd_rs1], imm);
+            else if (funct3 == 0x6)
+                printf("xori %s, %d\n", regNames[rd_rs1], imm);
+            else if (funct3 == 0x7)
+                printf("li %s, %d\n", regNames[rd_rs1], imm);
+            else
+                printf("unknown I-type instruction\n");
+
             break;
         }
+
         case 0x2: { // B-type (branch): [15:12] offset[4:1] | [11:9] rs2 | [8:6] rs1 | [5:3] funct3 | [2:0] opcode
             // your code goes here
             break;
@@ -85,7 +146,7 @@ void z16sim::disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize) 
 // Executes the instruction 'inst' (a 16-bit word) by updating registers, memory, and PC.
 // Returns 1 to continue simulation or 0 to terminate (if ecall 3 is executed).
 int z16sim::executeInstruction(uint16_t inst) {
-    uint8_t opcode = inst & 0x7;
+      uint8_t opcode = inst & 0x7;
     int pcUpdated = 0; // flag: if instruction updated PC directly
     switch(opcode) {
         case 0x0: { // R-type
@@ -93,21 +154,97 @@ int z16sim::executeInstruction(uint16_t inst) {
             uint8_t rs2     = (inst >> 9) & 0x7;
             uint8_t rd_rs1  = (inst >> 6) & 0x7;
             uint8_t funct3  = (inst >> 3) & 0x7;
-            if(funct4 == 0x0 && funct3 == 0x0) // add
+
+            if (funct4 == 0x0 && funct3 == 0x0) // ADD
                 regs[rd_rs1] = regs[rd_rs1] + regs[rs2];
-            else if(funct4 == 0x1 && funct3 == 0x0) // sub
+
+            else if (funct4 == 0x1 && funct3 == 0x0) // SUB
                 regs[rd_rs1] = regs[rd_rs1] - regs[rs2];
-            // complete the rest
+
+            else if (funct4 == 0x2 && funct3 == 0x1) // SLT
+                regs[rd_rs1] = ((int16_t)regs[rd_rs1] < (int16_t)regs[rs2]) ? 1 : 0;
+
+            else if (funct4 == 0x3 && funct3 == 0x2) // SLTU
+                regs[rd_rs1] = (regs[rd_rs1] < regs[rs2]) ? 1 : 0;
+
+            else if (funct4 == 0x4 && funct3 == 0x3) // SLL
+                regs[rd_rs1] = regs[rd_rs1] << (regs[rs2] & 0xF); // Limit shift to 0–15
+
+            else if (funct4 == 0x5 && funct3 == 0x3) // SRL
+                regs[rd_rs1] = regs[rd_rs1] >> (regs[rs2] & 0xF);
+
+            else if (funct4 == 0x6 && funct3 == 0x3) // SRA
+                regs[rd_rs1] = ((int16_t)regs[rd_rs1]) >> (regs[rs2] & 0xF);
+
+            else if (funct4 == 0x7 && funct3 == 0x4) // OR
+                regs[rd_rs1] = regs[rd_rs1] | regs[rs2];
+
+            else if (funct4 == 0x8 && funct3 == 0x5) // AND
+                regs[rd_rs1] = regs[rd_rs1] & regs[rs2];
+
+            else if (funct4 == 0x9 && funct3 == 0x6) // XOR
+                regs[rd_rs1] = regs[rd_rs1] ^ regs[rs2];
+
+            else if (funct4 == 0xA && funct3 == 0x7) // MV
+                regs[rd_rs1] = regs[rs2];
+
+            else if (funct4 == 0xB && funct3 == 0x0) { // JR
+                pc = regs[rd_rs1];
+                pcUpdated = 1;
+            }
+
+            else if (funct4 == 0xC && funct3 == 0x0) { // JALR
+                regs[rd_rs1] = pc + 2;
+                pc = regs[rs2];
+                pcUpdated = 1;
+            }
+
             break;
         }
-        case 0x1: { // I-type
+        case 0x1: { // I-type: [15:9] imm[6:0] | [8:6] rd/rs1 | [5:3] funct3 | [2:0] opcode
             uint8_t imm7   = (inst >> 9) & 0x7F;
             uint8_t rd_rs1 = (inst >> 6) & 0x7;
             uint8_t funct3 = (inst >> 3) & 0x7;
-            int16_t simm = (imm7 & 0x40) ? (imm7 | 0xFF80) : imm7;
-            // your code goes here
+            int16_t simm = (imm7 & 0x40) ? (imm7 | 0xFF80) : imm7; // sign-extend imm7
+
+            if (funct3 == 0x0) { // ADDI
+                regs[rd_rs1] = regs[rd_rs1] + simm;
+            }
+            else if (funct3 == 0x1) { // SLTI (signed comparison)
+                regs[rd_rs1] = ((int16_t)regs[rd_rs1] < simm) ? 1 : 0;
+            }
+            else if (funct3 == 0x2) { // SLTUI (unsigned comparison)
+                regs[rd_rs1] = (regs[rd_rs1] < (uint16_t)simm) ? 1 : 0;
+            }
+            else if (funct3 == 0x3) {
+                uint8_t shamt = imm7 & 0xF; // shift amount
+                uint8_t shift_type = (imm7 >> 4) & 0x7; // imm7[6:4]
+                if (shift_type == 0x1) { // SLLI
+                    regs[rd_rs1] = regs[rd_rs1] << shamt;
+                }
+                else if (shift_type == 0x2) { // SRLI
+                    regs[rd_rs1] = regs[rd_rs1] >> shamt;
+                }
+                else if (shift_type == 0x4) { // SRAI
+                    regs[rd_rs1] = ((int16_t)regs[rd_rs1]) >> shamt;
+                }
+            }
+            else if (funct3 == 0x4) { // ORI
+                regs[rd_rs1] = regs[rd_rs1] | simm;
+            }
+            else if (funct3 == 0x5) { // ANDI
+                regs[rd_rs1] = regs[rd_rs1] & simm;
+            }
+            else if (funct3 == 0x6) { // XORI
+                regs[rd_rs1] = regs[rd_rs1] ^ simm;
+            }
+            else if (funct3 == 0x7) { // LI
+                regs[rd_rs1] = simm;
+            }
+
             break;
         }
+
         case 0x2: { // B-type (branch)
 
             // your code goes here
