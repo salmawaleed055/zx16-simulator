@@ -93,8 +93,8 @@ void z16sim::disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize) 
             uint8_t rd_rs1 = (inst >> 6) & 0x7;
             uint8_t funct3 = (inst >> 3) & 0x7;
 
-            if (funct3 == 0x0)
-                printf("addi %s, %d\n", regNames[rd_rs1], imm);
+                if (funct3 == 0x0)
+                    printf("addi %s, %d\n", regNames[rd_rs1], imm);
             else if (funct3 == 0x1)
                 printf("slti %s, %d\n", regNames[rd_rs1], imm);
             else if (funct3 == 0x2)
@@ -127,10 +127,77 @@ void z16sim::disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize) 
         }
 
         case 0x2: { // B-type (branch): [15:12] offset[4:1] | [11:9] rs2 | [8:6] rs1 | [5:3] funct3 | [2:0] opcode
-            // your code goes here
-            break;
-        }
+                uint8_t imm_high = (inst >> 12) & 0xF; // imm[4:1]
+                uint8_t rs2 = (inst >> 9) & 0x7;
+                uint8_t rs1 = (inst >> 6) & 0x7;
+                uint8_t funct3 = (inst >> 3) & 0x7;
 
+                // Reconstruct 5-bit signed offset (imm[0] = 0, so multiply by 2)
+                int16_t offset = (imm_high << 1);
+                // Sign extend if bit 4 is set
+                if (offset & 0x10) offset |= 0xFFE0;
+
+                uint16_t target_addr = pc + offset;
+
+                if (funct3 == 0x0)
+                    snprintf(buf, bufSize, "beq %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x1)
+                    snprintf(buf, bufSize, "bne %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x2)
+                    snprintf(buf, bufSize, "blt %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x3)
+                    snprintf(buf, bufSize, "bge %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x4)
+                    snprintf(buf, bufSize, "bltu %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x5)
+                    snprintf(buf, bufSize, "bgeu %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x6)
+                    snprintf(buf, bufSize, "bz %s, 0x%04X", regNames[rs1], target_addr); // rs2 ignored
+                else if (funct3 == 0x7)
+                    snprintf(buf, bufSize, "bnz %s, 0x%04X", regNames[rs1], target_addr); // rs2 ignored
+                else
+                    snprintf(buf, bufSize, "unknown B-type");
+
+                break;
+        }
+        case 0x3: { // S-type (branch): [15:12] offset[4:1] | [11:9] rs2 | [8:6] rs1 | [5:3] funct3 | [2:0] opcode
+                uint8_t imm4 = (inst >> 12) & 0xF; // imm[3:0]
+                uint8_t rs2 = (inst >> 9) & 0x7;   // data register
+                uint8_t rs1 = (inst >> 6) & 0x7;   // base register
+                uint8_t funct3 = (inst >> 3) & 0x7;
+
+                // Sign extend 4-bit immediate
+                int16_t offset = (imm4 & 0x8) ? (imm4 | 0xFFF0) : imm4;
+
+                if (funct3 == 0x0)
+                    snprintf(buf, bufSize, "sb %s, %d(%s)", regNames[rs2], offset, regNames[rs1]);
+                else if (funct3 == 0x2)
+                    snprintf(buf, bufSize, "sw %s, %d(%s)", regNames[rs2], offset, regNames[rs1]);
+                else
+                    snprintf(buf, bufSize, "unknown S-type");
+
+                break;
+        }
+        case 0x4: { // L-type (branch): [15:12] offset[4:1] | [11:9] rs2 | [8:6] rs1 | [5:3] funct3 | [2:0] opcode
+                uint8_t imm4 = (inst >> 12) & 0xF; // imm[3:0]
+                uint8_t rs2 = (inst >> 9) & 0x7;   // base register
+                uint8_t rd = (inst >> 6) & 0x7;    // destination register
+                uint8_t funct3 = (inst >> 3) & 0x7;
+
+                // Sign extend 4-bit immediate
+                int16_t offset = (imm4 & 0x8) ? (imm4 | 0xFFF0) : imm4;
+
+                if (funct3 == 0x0)
+                    snprintf(buf, bufSize, "lb %s, %d(%s)", regNames[rd], offset, regNames[rs2]);
+                else if (funct3 == 0x2)
+                    snprintf(buf, bufSize, "lw %s, %d(%s)", regNames[rd], offset, regNames[rs2]);
+                else if (funct3 == 0x3)
+                    snprintf(buf, bufSize, "lbu %s, %d(%s)", regNames[rd], offset, regNames[rs2]);
+                else
+                    snprintf(buf, bufSize, "unknown L-type");
+
+                break;
+        }
         // complete the rest
 
         default:
@@ -246,13 +313,125 @@ int z16sim::executeInstruction(uint16_t inst) {
         }
 
         case 0x2: { // B-type (branch)
+                uint8_t imm_high = (inst >> 12) & 0xF; // imm[4:1]
+                uint8_t rs2 = (inst >> 9) & 0x7;
+                uint8_t rs1 = (inst >> 6) & 0x7;
+                uint8_t funct3 = (inst >> 3) & 0x7;
 
-            // your code goes here
+                // Reconstruct 5-bit signed offset (imm[0] = 0, so multiply by 2)
+                int16_t offset = (imm_high << 1);
+                // Sign extend if bit 4 is set
+                if (offset & 0x10) offset |= 0xFFE0;
+
+                bool branch_taken = false;
+
+                if (funct3 == 0x0) { // BEQ
+                    branch_taken = (regs[rs1] == regs[rs2]);
+                }
+                else if (funct3 == 0x1) { // BNE
+                    branch_taken = (regs[rs1] != regs[rs2]);
+                }
+                else if (funct3 == 0x2) { // BLT (signed)
+                    branch_taken = ((int16_t)regs[rs1] < (int16_t)regs[rs2]);
+                }
+                else if (funct3 == 0x3) { // BGE (signed)
+                    branch_taken = ((int16_t)regs[rs1] >= (int16_t)regs[rs2]);
+                }
+                else if (funct3 == 0x4) { // BLTU (unsigned)
+                    branch_taken = (regs[rs1] < regs[rs2]);
+                }
+                else if (funct3 == 0x5) { // BGEU (unsigned)
+                    branch_taken = (regs[rs1] >= regs[rs2]);
+                }
+                else if (funct3 == 0x6) { // BZ (branch if zero)
+                    branch_taken = (regs[rs1] == 0);
+                }
+                else if (funct3 == 0x7) { // BNZ (branch if not zero)
+                    branch_taken = (regs[rs1] != 0);
+                }
+
+                if (branch_taken) {
+                    pc += offset;
+                    pcUpdated = 1;
+                }
+
+
             break;
         }
-        case 0x3: { // L-type (load/store)
-            // your code goes here
+        case 0x3: { // S-type (store)
+                uint8_t imm4 = (inst >> 12) & 0xF; // imm[3:0]
+                uint8_t rs2 = (inst >> 9) & 0x7;   // data register
+                uint8_t rs1 = (inst >> 6) & 0x7;   // base register
+                uint8_t funct3 = (inst >> 3) & 0x7;
+
+                // Sign extend 4-bit immediate
+                int16_t offset = (imm4 & 0x8) ? (imm4 | 0xFFF0) : imm4;
+                uint16_t addr = regs[rs1] + offset;
+
+                // Check bounds
+                if (addr >= MEM_SIZE) {
+                    printf("Store address 0x%04X out of bounds\n", addr);
+                    break;
+                }
+
+                if (funct3 == 0x0) { // SB (store byte)
+                    memory[addr] = regs[rs2] & 0xFF;
+                }
+                else if (funct3 == 0x2) { // SW (store word - 16 bits)
+                    // Check word alignment
+                    if (addr & 0x1) {
+                        printf("Store word address 0x%04X not word-aligned\n", addr);
+                        break;
+                    }
+                    if (addr + 1 >= MEM_SIZE) {
+                        printf("Store word address 0x%04X out of bounds\n", addr);
+                        break;
+                    }
+                    // Little-endian storage
+                    memory[addr] = regs[rs2] & 0xFF;
+                    memory[addr + 1] = (regs[rs2] >> 8) & 0xFF;
+                }
+
             break;
+        }
+        case 0x4: { // L-type (load)
+                uint8_t imm4 = (inst >> 12) & 0xF; // imm[3:0]
+                uint8_t rs2 = (inst >> 9) & 0x7;   // base register
+                uint8_t rd = (inst >> 6) & 0x7;    // destination register
+                uint8_t funct3 = (inst >> 3) & 0x7;
+
+                // Sign extend 4-bit immediate
+                int16_t offset = (imm4 & 0x8) ? (imm4 | 0xFFF0) : imm4;
+                uint16_t addr = regs[rs2] + offset;
+
+                // Check bounds
+                if (addr >= MEM_SIZE) {
+                    printf("Load address 0x%04X out of bounds\n", addr);
+                    break;
+                }
+
+                if (funct3 == 0x0) { // LB (load byte, sign-extended)
+                    uint8_t byte_val = memory[addr];
+                    regs[rd] = (byte_val & 0x80) ? (byte_val | 0xFF00) : byte_val;
+                }
+                else if (funct3 == 0x2) { // LW (load word - 16 bits)
+                    // Check word alignment
+                    if (addr & 0x1) {
+                        printf("Load word address 0x%04X not word-aligned\n", addr);
+                        break;
+                    }
+                    if (addr + 1 >= MEM_SIZE) {
+                        printf("Load word address 0x%04X out of bounds\n", addr);
+                        break;
+                    }
+                    // Little-endian load
+                    regs[rd] = memory[addr] | (memory[addr + 1] << 8);
+                }
+                else if (funct3 == 0x3) { // LBU (load byte unsigned)
+                    regs[rd] = memory[addr];
+                }
+
+                    break;
         }
         case 0x5: { // J-type (jump)
             // your code goes here
@@ -279,7 +458,7 @@ int z16sim::executeInstruction(uint16_t inst) {
 // Memory Loading
 // -----------------------
 //
-// Loads the binary machine code image from the specified file into simulated memory.
+//Loads the binary machine code image from the specified file into simulated memory.
 void z16sim::loadMemoryFromFile(const char *filename) {
     FILE *fp = fopen(filename, "rb");
     if(!fp) {
@@ -292,12 +471,20 @@ void z16sim::loadMemoryFromFile(const char *filename) {
 }
 
 bool z16sim::cycle() {
-    // Terminate if PC goes out of bounds
-    if(pc >= MEM_SIZE - 1) return 0;
+    // Terminate if PC goes out of bounds (this check is also in updatePC, but good for initial check)
+    if(pc >= MEM_SIZE - 1) {
+        printf("PC 0x%04X out of bounds at start of cycle.\n", pc);
+        return false;
+    }
 
     char disasmBuf[128];
 
     // Fetch a 16-bit instruction from memory (little-endian)
+    // Add bounds check for instruction fetch
+    if (pc + 1 >= MEM_SIZE) {
+        printf("Instruction fetch at 0x%04X would go out of bounds.\n", pc);
+        return false;
+    }
     uint16_t inst = memory[pc] | (memory[pc+1] << 8);
 
     disassemble(inst, pc, disasmBuf, sizeof(disasmBuf));
@@ -309,3 +496,27 @@ bool z16sim::cycle() {
 }
 
 
+bool z16sim::updatePC(uint16_t new_pc, const char* instruction_name)
+{
+    // Check if new PC is within valid memory bounds for instruction fetch
+    // An instruction is 2 bytes, so new_pc + 1 must be within MEM_SIZE.
+    if (new_pc >= MEM_SIZE - 1) {
+        printf("%s: PC 0x%04X out of bounds for next instruction fetch\n", instruction_name, new_pc);
+        return false;
+    }
+
+    // Check if PC is word-aligned (even address for 16-bit instructions)
+    if (new_pc & 0x1) {
+        printf("%s: PC 0x%04X not aligned to instruction boundary\n", instruction_name, new_pc);
+        return false;
+    }
+
+    // Check if trying to execute from MMIO region (0xF000-0xFFFF)
+    if (new_pc >= 0xF000) {
+        printf("%s: Cannot execute from MMIO region 0x%04X\n", instruction_name, new_pc);
+        return false;
+    }
+
+    pc = new_pc; // Update the class member pc
+    return true;
+}
