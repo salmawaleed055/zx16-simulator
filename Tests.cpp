@@ -1,9 +1,11 @@
-#include "z16sim.h" // Include your simulator header
+#include "z16sim.h"
 #include <iostream>
 #include <vector>
-#include <iomanip> // For std::hex, std::setw, std::setfill
+#include <iomanip>
+#include <sstream>
+#include <streambuf>
 
-// Helper function to create a dummy binary file for testing
+
 void createTestBin(const char* filename, const std::vector<uint16_t>& instructions) {
     FILE* fp = fopen(filename, "wb");
     if (!fp) {
@@ -27,24 +29,128 @@ void createTestBin(const char* filename, const std::vector<uint16_t>& instructio
                   << ", Got 0x" << std::hex << (actual) << std::dec << std::endl; \
     }
 
+// Helper to capture stdout for system call tests
+class StdCapture {
+private:
+    std::ostringstream m_captured;
+    std::streambuf* m_old;
+public:
+    void BeginCapture() {
+        m_old = std::cout.rdbuf();
+        std::cout.rdbuf(m_captured.rdbuf());
+    }
+    std::string EndCapture() {
+        std::cout.rdbuf(m_old);
+        return m_captured.str();
+    }
+};
+
 // Forward declarations of test functions
+void testRType();
+void testIType();
 void testBType();
 void testSType();
 void testLType();
 
-
 int main() {
-    std::cout << "Starting Z16 Simulator Tests (B, S, L Types Only)...\n" << std::endl;
+    std::cout << "Starting Complete Z16 Simulator Tests...\n" << std::endl;
 
+    testRType();
+    std::cout << "\n-----------------------------------\n" << std::endl;
+    testIType();
+    std::cout << "\n-----------------------------------\n" << std::endl;
     testBType();
     std::cout << "\n-----------------------------------\n" << std::endl;
     testSType();
     std::cout << "\n-----------------------------------\n" << std::endl;
     testLType();
+    std::cout << "\n-----------------------------------\n" << std::endl;
+    // testJType();
+    // std::cout << "\n-----------------------------------\n" << std::endl;
+    // testUType();
+    // std::cout << "\n-----------------------------------\n" << std::endl;
+    // testSystemType();
 
-    std::cout << "\nAll selected tests completed." << std::endl;
+    std::cout << "\nAll tests completed." << std::endl;
     return 0;
 }
+// --- R-Type Test Cases ---
+void testRType() {
+    std::cout << "--- R-Type Tests ---" << std::endl;
+    z16sim sim;
+
+    std::vector<uint16_t> add_inst = { 0x0440 }; // Correct ADD x1, x2
+    createTestBin("test_add.bin", add_inst);
+    sim.loadMemoryFromFile("test_add.bin");
+    sim.setReg(1, 5);
+    sim.setReg(2, 3);
+    sim.cycle();
+    ASSERT_EQ(sim.getReg(1), (uint16_t)8, "ADD x1, x2 => x1 = 5 + 3");
+
+    sim = z16sim();
+    std::vector<uint16_t> sub_inst = { 0x1440 }; // Correct SUB x1, x2
+    createTestBin("test_sub.bin", sub_inst);
+    sim.loadMemoryFromFile("test_sub.bin");
+    sim.setReg(1, 7);
+    sim.setReg(2, 2);
+    sim.cycle();
+    ASSERT_EQ(sim.getReg(1), (uint16_t)5, "SUB x1, x2 => x1 = 7 - 2");
+
+    sim = z16sim();
+    std::vector<uint16_t> and_inst = { 0x8468 };// Correct AND x1, x2
+    createTestBin("test_and.bin", and_inst);
+    sim.loadMemoryFromFile("test_and.bin");
+    sim.setReg(1, 0xABCD);
+    sim.setReg(2, 0x0F0F);
+    sim.cycle();
+    ASSERT_EQ(sim.getReg(1), (uint16_t)(0xABCD & 0x0F0F), "AND x1, x2");
+
+    std::cout << "--- R-Type Tests Complete ---" << std::endl;
+}
+
+// --- I-Type Test Cases ---
+void testIType() {
+    std::cout << "--- I-Type Tests ---" << std::endl;
+    z16sim sim;
+
+    // ADDI x1, 7 => x1 = x1 + 7
+    std::vector<uint16_t> addi_inst = { 0x0E41 };
+    createTestBin("test_addi.bin", addi_inst);
+    sim.loadMemoryFromFile("test_addi.bin");
+    sim.setReg(1, 10);
+    sim.cycle();
+    ASSERT_EQ(sim.getReg(1), (uint16_t)(10 + 7), "ADDI x1, 7");
+
+    // SLTI x1, -1 => x1 = (x1 < -1) => 1 if true
+    sim = z16sim();
+    std::vector<uint16_t> slti_inst = { 0xFE51 };
+    createTestBin("test_slti.bin", slti_inst);
+    sim.loadMemoryFromFile("test_slti.bin");
+    sim.setReg(1, -2);
+    sim.cycle();
+    ASSERT_EQ(sim.getReg(1), (uint16_t)1, "SLTI x1, -1");
+
+    // SLLI x1, 4 => x1 = x1 << 4
+    sim = z16sim();
+    std::vector<uint16_t> slli_inst = { 0x2859 }; // SLLI x1, 4
+    createTestBin("test_slli.bin", slli_inst);
+    sim.loadMemoryFromFile("test_slli.bin");
+    sim.setReg(1, 0x0001);
+    sim.cycle();
+    ASSERT_EQ(sim.getReg(1), (uint16_t)0x0010, "SLLI x1, 4");
+
+
+    // LI x1, -5 => x1 = -5 (ADDI x1, x0, -5)
+    sim = z16sim();
+    std::vector<uint16_t> li_inst = { 0xF641 };
+    createTestBin("test_li.bin", li_inst);
+    sim.loadMemoryFromFile("test_li.bin");
+    sim.cycle();
+    ASSERT_EQ(sim.getReg(1), (uint16_t)0xFFFB, "LI x1, -5");
+
+    std::cout << "--- I-Type Tests Complete ---" << std::endl;
+}
+
 
 // --- B-Type Test Cases ---
 void testBType() {

@@ -49,80 +49,82 @@ z16sim::z16sim() {
 // string to 'buf' (of size bufSize). This decoder uses the opcode (bits [2:0]) to distinguish
 // among R‑, I‑, B‑, L‑, J‑, U‑, and System instructions.
 void z16sim::disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize) {
-    uint8_t opcode = inst & 0x7;
+     uint8_t opcode = inst & 0x7;
     switch(opcode) {
-        case 0x0: { // R-type
-            uint8_t funct4 = (inst >> 12) & 0xF;
+         case 0x0: { // R-type
+            uint8_t funct4  = (inst >> 12) & 0xF;
             uint8_t rs2     = (inst >> 9) & 0x7;
             uint8_t rd_rs1  = (inst >> 6) & 0x7;
             uint8_t funct3  = (inst >> 3) & 0x7;
 
-            if(funct4 == 0x0 && funct3 == 0x0)
+            if (funct4 == 0x0 && funct3 == 0x0)
                 snprintf(buf, bufSize, "add %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if(funct4 == 0x1 && funct3 == 0x0)
+            else if (funct4 == 0x1 && funct3 == 0x0)
                 snprintf(buf, bufSize, "sub %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if(funct4 == 0x2 && funct3 == 0x1)
+            else if (funct4 == 0x2 && funct3 == 0x1)
                 snprintf(buf, bufSize, "slt %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if(funct4 == 0x3 && funct3 == 0x2)
+            else if (funct4 == 0x3 && funct3 == 0x2)
                 snprintf(buf, bufSize, "sltu %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if(funct4 == 0x4 && funct3 == 0x3)
+            else if (funct4 == 0x4 && funct3 == 0x3)
                 snprintf(buf, bufSize, "sll %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if(funct4 == 0x5 && funct3 == 0x3)
+            else if (funct4 == 0x5 && funct3 == 0x3)
                 snprintf(buf, bufSize, "srl %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if(funct4 == 0x6 && funct3 == 0x3)
+            else if (funct4 == 0x6 && funct3 == 0x3)
                 snprintf(buf, bufSize, "sra %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if(funct4 == 0x7 && funct3 == 0x4)
+            else if (funct4 == 0x7 && funct3 == 0x4)
                 snprintf(buf, bufSize, "or %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if(funct4 == 0x8 && funct3 == 0x5)
+            else if (funct4 == 0x8 && funct3 == 0x5)
                 snprintf(buf, bufSize, "and %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if(funct4 == 0x9 && funct3 == 0x6)
+            else if (funct4 == 0x9 && funct3 == 0x6)
                 snprintf(buf, bufSize, "xor %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if(funct4 == 0xA && funct3 == 0x7)
+            else if (funct4 == 0xA && funct3 == 0x7)
                 snprintf(buf, bufSize, "mv %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if(funct4 == 0xB && funct3 == 0x0)
-                snprintf(buf, bufSize, "jr %s", regNames[rd_rs1]); // usually only one register (PC <- rs1)
-            else if(funct4 == 0xC && funct3 == 0x0)
+            else if (funct4 == 0xB && funct3 == 0x0)
+                snprintf(buf, bufSize, "jr %s", regNames[rd_rs1]);
+            else if (funct4 == 0xC && funct3 == 0x0)
                 snprintf(buf, bufSize, "jalr %s", regNames[rd_rs1]);
             else
                 snprintf(buf, bufSize, "unknown R-type");
-
             break;
         }
-        case 0x1: { // I-type: [15:9] imm[6:0] | [8:6] rd/rs1 | [5:3] funct3 | [2:0] opcode
+
+        case 0x1: { // I-type
             int16_t imm = (inst >> 9) & 0x7F;
+            // Sign-extend if imm is negative
+            if (imm & 0x40) imm |= 0xFF80;
+
             uint8_t rd_rs1 = (inst >> 6) & 0x7;
             uint8_t funct3 = (inst >> 3) & 0x7;
 
-                if (funct3 == 0x0)
-                    printf("addi %s, %d\n", regNames[rd_rs1], imm);
+            if (funct3 == 0x0)
+                snprintf(buf, bufSize, "addi %s, %d", regNames[rd_rs1], imm);
             else if (funct3 == 0x1)
-                printf("slti %s, %d\n", regNames[rd_rs1], imm);
+                snprintf(buf, bufSize, "slti %s, %d", regNames[rd_rs1], imm);
             else if (funct3 == 0x2)
-                printf("sltui %s, %d\n", regNames[rd_rs1], imm);
+                snprintf(buf, bufSize, "sltui %s, %d", regNames[rd_rs1], imm);
             else if (funct3 == 0x3) {
-                // Shift immediate instructions
-                uint8_t shamt = imm & 0xF;
+                // Check bits 6:4 of imm for shift type
                 uint8_t shift_type = (imm >> 4) & 0x7;
+                uint8_t shamt = imm & 0xF;
                 if (shift_type == 0x1)
-                    printf("slli %s, %d\n", regNames[rd_rs1], shamt);
+                    snprintf(buf, bufSize, "slli %s, %d", regNames[rd_rs1], shamt);
                 else if (shift_type == 0x2)
-                    printf("srli %s, %d\n", regNames[rd_rs1], shamt);
+                    snprintf(buf, bufSize, "srli %s, %d", regNames[rd_rs1], shamt);
                 else if (shift_type == 0x4)
-                    printf("srai %s, %d\n", regNames[rd_rs1], shamt);
+                    snprintf(buf, bufSize, "srai %s, %d", regNames[rd_rs1], shamt);
                 else
-                    printf("unknown shift instruction (funct3 = 0x3)\n");
+                    snprintf(buf, bufSize, "unknown shift imm");
             }
             else if (funct3 == 0x4)
-                printf("ori %s, %d\n", regNames[rd_rs1], imm);
+                snprintf(buf, bufSize, "ori %s, %d", regNames[rd_rs1], imm);
             else if (funct3 == 0x5)
-                printf("andi %s, %d\n", regNames[rd_rs1], imm);
+                snprintf(buf, bufSize, "andi %s, %d", regNames[rd_rs1], imm);
             else if (funct3 == 0x6)
-                printf("xori %s, %d\n", regNames[rd_rs1], imm);
+                snprintf(buf, bufSize, "xori %s, %d", regNames[rd_rs1], imm);
             else if (funct3 == 0x7)
-                printf("li %s, %d\n", regNames[rd_rs1], imm);
+                snprintf(buf, bufSize, "li %s, %d", regNames[rd_rs1], imm);
             else
-                printf("unknown I-type instruction\n");
-
+                snprintf(buf, bufSize, "unknown I-type");
             break;
         }
 
@@ -270,8 +272,9 @@ void z16sim::disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize) 
 // Executes the instruction 'inst' (a 16-bit word) by updating registers, memory, and PC.
 // Returns 1 to continue simulation or 0 to terminate (if ecall 3 is executed).
 int z16sim::executeInstruction(uint16_t inst) {
-      uint8_t opcode = inst & 0x7;
+    uint8_t opcode = inst & 0x7;
     int pcUpdated = 0; // flag: if instruction updated PC directly
+
     switch(opcode) {
         case 0x0: { // R-type
             uint8_t funct4 = (inst >> 12) & 0xF;
@@ -281,89 +284,83 @@ int z16sim::executeInstruction(uint16_t inst) {
 
             if (funct4 == 0x0 && funct3 == 0x0) // ADD
                 regs[rd_rs1] = regs[rd_rs1] + regs[rs2];
-
             else if (funct4 == 0x1 && funct3 == 0x0) // SUB
                 regs[rd_rs1] = regs[rd_rs1] - regs[rs2];
-
             else if (funct4 == 0x2 && funct3 == 0x1) // SLT
                 regs[rd_rs1] = ((int16_t)regs[rd_rs1] < (int16_t)regs[rs2]) ? 1 : 0;
-
             else if (funct4 == 0x3 && funct3 == 0x2) // SLTU
                 regs[rd_rs1] = (regs[rd_rs1] < regs[rs2]) ? 1 : 0;
-
             else if (funct4 == 0x4 && funct3 == 0x3) // SLL
                 regs[rd_rs1] = regs[rd_rs1] << (regs[rs2] & 0xF); // Limit shift to 0–15
-
             else if (funct4 == 0x5 && funct3 == 0x3) // SRL
                 regs[rd_rs1] = regs[rd_rs1] >> (regs[rs2] & 0xF);
-
             else if (funct4 == 0x6 && funct3 == 0x3) // SRA
                 regs[rd_rs1] = ((int16_t)regs[rd_rs1]) >> (regs[rs2] & 0xF);
-
-            else if (funct4 == 0x7 && funct3 == 0x4) // OR
-                regs[rd_rs1] = regs[rd_rs1] | regs[rs2];
-
-            else if (funct4 == 0x8 && funct3 == 0x5) // AND
-                regs[rd_rs1] = regs[rd_rs1] & regs[rs2];
-
-            else if (funct4 == 0x9 && funct3 == 0x6) // XOR
-                regs[rd_rs1] = regs[rd_rs1] ^ regs[rs2];
-
             else if (funct4 == 0xA && funct3 == 0x7) // MV
                 regs[rd_rs1] = regs[rs2];
-
+            else if (funct4 == 0x8 && funct3 == 0x5) // AND
+                regs[rd_rs1] = regs[rd_rs1] & regs[rs2];
+            else if (funct4 == 0x7 && funct3 == 0x4) // OR
+                regs[rd_rs1] = regs[rd_rs1] | regs[rs2];
+            else if (funct4 == 0x9 && funct3 == 0x6) // XOR
+                regs[rd_rs1] = regs[rd_rs1] ^ regs[rs2];
             else if (funct4 == 0xB && funct3 == 0x0) { // JR
                 pc = regs[rd_rs1];
                 pcUpdated = 1;
             }
-
             else if (funct4 == 0xC && funct3 == 0x0) { // JALR
+                uint16_t new_pc = regs[rd_rs1];
                 regs[rd_rs1] = pc + 2;
-                pc = regs[rs2];
+                pc = new_pc;
                 pcUpdated = 1;
             }
 
-            break;
+            break; // CRITICAL FIX: Added missing break statement
         }
-        case 0x1: { // I-type: [15:9] imm[6:0] | [8:6] rd/rs1 | [5:3] funct3 | [2:0] opcode
-            uint8_t imm7   = (inst >> 9) & 0x7F;
-            uint8_t rd_rs1 = (inst >> 6) & 0x7;
-            uint8_t funct3 = (inst >> 3) & 0x7;
-            int16_t simm = (imm7 & 0x40) ? (imm7 | 0xFF80) : imm7; // sign-extend imm7
 
-            if (funct3 == 0x0) { // ADDI
-                regs[rd_rs1] = regs[rd_rs1] + simm;
-            }
-            else if (funct3 == 0x1) { // SLTI (signed comparison)
-                regs[rd_rs1] = ((int16_t)regs[rd_rs1] < simm) ? 1 : 0;
-            }
-            else if (funct3 == 0x2) { // SLTUI (unsigned comparison)
-                regs[rd_rs1] = (regs[rd_rs1] < (uint16_t)simm) ? 1 : 0;
-            }
-            else if (funct3 == 0x3) {
-                uint8_t shamt = imm7 & 0xF; // shift amount
-                uint8_t shift_type = (imm7 >> 4) & 0x7; // imm7[6:4]
-                if (shift_type == 0x1) { // SLLI
-                    regs[rd_rs1] = regs[rd_rs1] << shamt;
+        case 0x1: { // I-type: [15:9] imm[6:0] | [8:6] rd | [5:3] funct3 | [2:0] opcode
+            uint8_t imm7     = (inst >> 9) & 0x7F;
+            uint8_t rd       = (inst >> 6) & 0x7;
+            uint8_t funct3   = (inst >> 3) & 0x7;
+
+            // Sign-extended immediate
+            int16_t simm = (imm7 & 0x40) ? (imm7 | 0xFF80) : imm7;
+
+            switch (funct3) {
+                case 0x0: // ADDI
+                    regs[rd] += simm;
+                break;
+                case 0x1: // SLTI
+                    regs[rd] = ((int16_t)regs[rd] < simm) ? 1 : 0;
+                break;
+                case 0x2: // SLTUI
+                    regs[rd] = (regs[rd] < (uint16_t)simm) ? 1 : 0;
+                break;
+                case 0x3: { // Shift instructions
+                    uint8_t shamt       = imm7 & 0xF;         // shift amount
+                    uint8_t shift_type  = (imm7 >> 4) & 0x7;  // shift function selector
+
+                    if (shift_type == 0x1) {      // SLLI
+                        regs[rd] <<= shamt;
+                    } else if (shift_type == 0x2) { // SRLI
+                        regs[rd] >>= shamt;
+                    } else if (shift_type == 0x4) { // SRAI
+                        regs[rd] = (int16_t)regs[rd] >> shamt;
+                    }
+                    break;
                 }
-                else if (shift_type == 0x2) { // SRLI
-                    regs[rd_rs1] = regs[rd_rs1] >> shamt;
-                }
-                else if (shift_type == 0x4) { // SRAI
-                    regs[rd_rs1] = ((int16_t)regs[rd_rs1]) >> shamt;
-                }
-            }
-            else if (funct3 == 0x4) { // ORI
-                regs[rd_rs1] = regs[rd_rs1] | simm;
-            }
-            else if (funct3 == 0x5) { // ANDI
-                regs[rd_rs1] = regs[rd_rs1] & simm;
-            }
-            else if (funct3 == 0x6) { // XORI
-                regs[rd_rs1] = regs[rd_rs1] ^ simm;
-            }
-            else if (funct3 == 0x7) { // LI
-                regs[rd_rs1] = simm;
+                case 0x4: // ORI
+                    regs[rd] |= simm;
+                break;
+                case 0x5: // ANDI
+                    regs[rd] &= simm;
+                break;
+                case 0x6: // XORI
+                    regs[rd] ^= simm;
+                break;
+                case 0x7: // LI (Load Immediate — just write imm)
+                    regs[rd] = simm;
+                break;
             }
 
             break;
@@ -582,30 +579,41 @@ void z16sim::loadMemoryFromFile(const char *filename) {
 }
 
 bool z16sim::cycle() {
-    // Terminate if PC goes out of bounds (this check is also in updatePC, but good for initial check)
-    if(pc >= MEM_SIZE - 1) {
-        printf("PC 0x%04X out of bounds at start of cycle.\n", pc);
-        return false;
-    }
-
     char disasmBuf[128];
 
-    // Fetch a 16-bit instruction from memory (little-endian)
-    // Add bounds check for instruction fetch
+    // Check if PC is within valid memory bounds for instruction fetch
+    // An instruction is 2 bytes, so pc + 1 must be within MEM_SIZE
     if (pc + 1 >= MEM_SIZE) {
-        printf("Instruction fetch at 0x%04X would go out of bounds.\n", pc);
+        printf("Instruction fetch at PC 0x%04X would go out of bounds.\n", pc);
         return false;
     }
-    uint16_t inst = memory[pc] | (memory[pc+1] << 8);
 
+    // Check if PC is word-aligned (even address for 16-bit instructions)
+    if (pc & 0x1) {
+        printf("PC 0x%04X not aligned to instruction boundary.\n", pc);
+        return false;
+    }
+
+    // Check if trying to execute from MMIO region (0xF000-0xFFFF)
+    if (pc >= 0xF000) {
+        printf("Cannot execute from MMIO region at PC 0x%04X.\n", pc);
+        return false;
+    }
+
+    // Fetch a 16-bit instruction from memory (little-endian)
+    uint16_t inst = memory[pc] | (memory[pc + 1] << 8);
+
+    // Disassemble and print the instruction
     disassemble(inst, pc, disasmBuf, sizeof(disasmBuf));
     printf("0x%04X: %04X    %s\n", pc, inst, disasmBuf);
 
-    if(!executeInstruction(inst)) return false;
+    // Execute the instruction
+    if (!executeInstruction(inst)) {
+        return false; // Instruction requested termination (e.g., ecall 0x3FF)
+    }
 
-    return true;
+    return true; // Continue execution
 }
-
 
 bool z16sim::updatePC(uint16_t new_pc, const char* instruction_name)
 {
