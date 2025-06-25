@@ -127,11 +127,135 @@ void z16sim::disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize) 
         }
 
         case 0x2: { // B-type (branch): [15:12] offset[4:1] | [11:9] rs2 | [8:6] rs1 | [5:3] funct3 | [2:0] opcode
-            // your code goes here
-            break;
+                uint8_t imm_high = (inst >> 12) & 0xF; // imm[4:1]
+                uint8_t rs2 = (inst >> 9) & 0x7;
+                uint8_t rs1 = (inst >> 6) & 0x7;
+                uint8_t funct3 = (inst >> 3) & 0x7;
+
+                // Reconstruct 5-bit signed offset (imm[0] = 0, so multiply by 2)
+                int16_t offset = (imm_high << 1);
+                // Sign extend if bit 4 is set
+                if (offset & 0x10) offset |= 0xFFE0;
+
+                uint16_t target_addr = pc + offset;
+
+                if (funct3 == 0x0)
+                    snprintf(buf, bufSize, "beq %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x1)
+                    snprintf(buf, bufSize, "bne %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x2)
+                    snprintf(buf, bufSize, "blt %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x3)
+                    snprintf(buf, bufSize, "bge %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x4)
+                    snprintf(buf, bufSize, "bltu %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x5)
+                    snprintf(buf, bufSize, "bgeu %s, %s, 0x%04X", regNames[rs1], regNames[rs2], target_addr);
+                else if (funct3 == 0x6)
+                    snprintf(buf, bufSize, "bz %s, 0x%04X", regNames[rs1], target_addr); // rs2 ignored
+                else if (funct3 == 0x7)
+                    snprintf(buf, bufSize, "bnz %s, 0x%04X", regNames[rs1], target_addr); // rs2 ignored
+                else
+                    snprintf(buf, bufSize, "unknown B-type");
+
+                break;
         }
 
-        // complete the rest
+        case 0x3: { // S-type (branch): [15:12] offset[4:1] | [11:9] rs2 | [8:6] rs1 | [5:3] funct3 | [2:0] opcode
+                uint8_t imm4 = (inst >> 12) & 0xF; // imm[3:0]
+                uint8_t rs2 = (inst >> 9) & 0x7;   // data register
+                uint8_t rs1 = (inst >> 6) & 0x7;   // base register
+                uint8_t funct3 = (inst >> 3) & 0x7;
+
+                // Sign extend 4-bit immediate
+                int16_t offset = (imm4 & 0x8) ? (imm4 | 0xFFF0) : imm4;
+
+                if (funct3 == 0x0)
+                    snprintf(buf, bufSize, "sb %s, %d(%s)", regNames[rs2], offset, regNames[rs1]);
+                else if (funct3 == 0x2)
+                    snprintf(buf, bufSize, "sw %s, %d(%s)", regNames[rs2], offset, regNames[rs1]);
+                else
+                    snprintf(buf, bufSize, "unknown S-type");
+
+                break;
+        }
+
+        case 0x4: { // L-type (branch): [15:12] offset[4:1] | [11:9] rs2 | [8:6] rs1 | [5:3] funct3 | [2:0] opcode
+                uint8_t imm4 = (inst >> 12) & 0xF; // imm[3:0]
+                uint8_t rs2 = (inst >> 9) & 0x7;   // base register
+                uint8_t rd = (inst >> 6) & 0x7;    // destination register
+                uint8_t funct3 = (inst >> 3) & 0x7;
+
+                // Sign extend 4-bit immediate
+                int16_t offset = (imm4 & 0x8) ? (imm4 | 0xFFF0) : imm4;
+
+                if (funct3 == 0x0)
+                    snprintf(buf, bufSize, "lb %s, %d(%s)", regNames[rd], offset, regNames[rs2]);
+                else if (funct3 == 0x2)
+                    snprintf(buf, bufSize, "lw %s, %d(%s)", regNames[rd], offset, regNames[rs2]);
+                else if (funct3 == 0x3)
+                    snprintf(buf, bufSize, "lbu %s, %d(%s)", regNames[rd], offset, regNames[rs2]);
+                else
+                    snprintf(buf, bufSize, "unknown L-type");
+
+                break;
+        }
+
+
+        //J-Type (opcode = 101)
+        case 0x5: { // J-Type (jump): [15]link flag | [14:9] imm[9:4] | [8:6] rd | [5:3] imm[3:1] | [2:0] opcode
+            uint8_t link_flag = (inst >> 15) & 0x1; // (0 = J, 1 = JAL)
+            int16_t imm9_4 = (inst >> 9) & 0x3F; // (high 6 bits of 10-bit signed offset, imm[0] = 0)
+            uint8_t rd = (inst >> 6) & 0x7; // (link register for JAL)
+            int16_t imm3_1 = (inst >> 3) & 0x7; // (low 3 bits of offset)
+
+            int16_t imm = (imm9_4 << 3) | imm3_1; // combine immediates
+
+            // sign extend immedate if needed
+            if (imm & (1 << 8))
+                imm = imm | 0xFE00;
+
+            // calculate PC relative target address (PC + 2)
+            uint16_t target = pc + (imm * 2);
+
+            if (link_flag) // JAL
+                snprintf(buf, bufSize,"jal %s, 0x%04X\n", regNames[rd], target);
+            else // J
+                snprintf(buf, bufSize, "j 0x%04X\n", target);
+        }
+
+        // U-Type (opcode = 110)
+        case 0x6: { // U-Type: [15] flag | [14:9] imm15_10 | [8:6] rd | [5:3] imm9_7 | [2:0] opcode
+            uint8_t flag = (inst >> 15) & 0x1; // (0 = LUI, 1 = AUIPC)
+            int16_t imm15_10 = (inst >> 9) & 0x3F; // (high 6 bits of immediate)
+            uint8_t rd = (inst >> 6) & 0x7;
+            int16_t imm9_7 = (inst >> 3) & 0x7; // (mid 3 bits of immediate)
+
+            int16_t imm = (imm15_10 << 3) | imm9_7; // combine immediates
+
+            // sign extend immedate if needed
+            if (imm & (1 << 8))
+                imm = imm | 0xFE00;
+
+            // shift immediate to upper bits
+            imm = imm << 7;
+
+            if (flag) // AUIPC
+                snprintf(buf, bufSize, "auipc %s, 0x%04X\n", regNames[rd], imm);
+            else // LUI
+                snprintf(buf, bufSize, "lui %s, 0x%04X\n", regNames[rd], imm);
+        }
+
+        // SYS-Type (opcode = 111)
+        case 0x7: { // SYS-Type: [15:6] svc | [5:3] 000 | [2:0] opcode
+            uint16_t svc = (inst >> 6) & 0x3FF; // (10-bit system-call number)
+            uint8_t func3 = (inst >> 3) & 0x7; // 000
+
+            if (func3 == 0x0)
+                snprintf(buf, bufSize, "ecall 0x%03X\n", svc);
+            else
+                snprintf(buf, bufSize, "Invalid SYS-Type instruction");
+        }
 
         default:
             snprintf(buf, bufSize, "Unknown opcode");
@@ -246,26 +370,192 @@ int z16sim::executeInstruction(uint16_t inst) {
         }
 
         case 0x2: { // B-type (branch)
+            uint8_t imm_high = (inst >> 12) & 0xF; // imm[4:1]
+            uint8_t rs2 = (inst >> 9) & 0x7;
+            uint8_t rs1 = (inst >> 6) & 0x7;
+            uint8_t funct3 = (inst >> 3) & 0x7;
 
-            // your code goes here
+            // Reconstruct 5-bit signed offset (imm[0] = 0, so multiply by 2)
+            int16_t offset = (imm_high << 1);
+            // Sign extend if bit 4 is set
+            if (offset & 0x10) offset |= 0xFFE0;
+
+            bool branch_taken = false;
+
+            if (funct3 == 0x0) { // BEQ
+                branch_taken = (regs[rs1] == regs[rs2]);
+            }
+            else if (funct3 == 0x1) { // BNE
+                branch_taken = (regs[rs1] != regs[rs2]);
+            }
+            else if (funct3 == 0x2) { // BLT (signed)
+                branch_taken = ((int16_t)regs[rs1] < (int16_t)regs[rs2]);
+            }
+            else if (funct3 == 0x3) { // BGE (signed)
+                branch_taken = ((int16_t)regs[rs1] >= (int16_t)regs[rs2]);
+            }
+            else if (funct3 == 0x4) { // BLTU (unsigned)
+                branch_taken = (regs[rs1] < regs[rs2]);
+            }
+            else if (funct3 == 0x5) { // BGEU (unsigned)
+                branch_taken = (regs[rs1] >= regs[rs2]);
+            }
+            else if (funct3 == 0x6) { // BZ (branch if zero)
+                branch_taken = (regs[rs1] == 0);
+            }
+            else if (funct3 == 0x7) { // BNZ (branch if not zero)
+                branch_taken = (regs[rs1] != 0);
+            }
+
+            if (branch_taken) {
+                pc += offset;
+                pcUpdated = 1;
+            }
+
+
             break;
         }
-        case 0x3: { // L-type (load/store)
-            // your code goes here
+
+        case 0x3: { // S-type (store)
+            uint8_t imm4 = (inst >> 12) & 0xF; // imm[3:0]
+            uint8_t rs2 = (inst >> 9) & 0x7;   // data register
+            uint8_t rs1 = (inst >> 6) & 0x7;   // base register
+            uint8_t funct3 = (inst >> 3) & 0x7;
+
+            // Sign extend 4-bit immediate
+            int16_t offset = (imm4 & 0x8) ? (imm4 | 0xFFF0) : imm4;
+            uint16_t addr = regs[rs1] + offset;
+
+            // Check bounds
+            if (addr >= MEM_SIZE) {
+                printf("Store address 0x%04X out of bounds\n", addr);
+                break;
+            }
+
+            if (funct3 == 0x0) { // SB (store byte)
+                memory[addr] = regs[rs2] & 0xFF;
+            }
+            else if (funct3 == 0x2) { // SW (store word - 16 bits)
+                // Check word alignment
+                if (addr & 0x1) {
+                    printf("Store word address 0x%04X not word-aligned\n", addr);
+                    break;
+                }
+                if (addr + 1 >= MEM_SIZE) {
+                    printf("Store word address 0x%04X out of bounds\n", addr);
+                    break;
+                }
+                // Little-endian storage
+                memory[addr] = regs[rs2] & 0xFF;
+                memory[addr + 1] = (regs[rs2] >> 8) & 0xFF;
+            }
+
             break;
         }
+        case 0x4: { // L-type (load)
+            uint8_t imm4 = (inst >> 12) & 0xF; // imm[3:0]
+            uint8_t rs2 = (inst >> 9) & 0x7;   // base register
+            uint8_t rd = (inst >> 6) & 0x7;    // destination register
+            uint8_t funct3 = (inst >> 3) & 0x7;
+
+            // Sign extend 4-bit immediate
+            int16_t offset = (imm4 & 0x8) ? (imm4 | 0xFFF0) : imm4;
+            uint16_t addr = regs[rs2] + offset;
+
+            // Check bounds
+            if (addr >= MEM_SIZE) {
+                printf("Load address 0x%04X out of bounds\n", addr);
+                break;
+            }
+
+            if (funct3 == 0x0) { // LB (load byte, sign-extended)
+                uint8_t byte_val = memory[addr];
+                regs[rd] = (byte_val & 0x80) ? (byte_val | 0xFF00) : byte_val;
+            }
+            else if (funct3 == 0x2) { // LW (load word - 16 bits)
+                // Check word alignment
+                if (addr & 0x1) {
+                    printf("Load word address 0x%04X not word-aligned\n", addr);
+                    break;
+                }
+                if (addr + 1 >= MEM_SIZE) {
+                    printf("Load word address 0x%04X out of bounds\n", addr);
+                    break;
+                }
+                // Little-endian load
+                regs[rd] = memory[addr] | (memory[addr + 1] << 8);
+            }
+            else if (funct3 == 0x3) { // LBU (load byte unsigned)
+                regs[rd] = memory[addr];
+            }
+
+            break;
+        }
+
         case 0x5: { // J-type (jump)
-            // your code goes here
-            break;
+            uint8_t link_flag = (inst >> 15) & 0x1; // (0 = J, 1 = JAL)
+            int16_t imm9_4 = (inst >> 9) & 0x3F; // (high 6 bits of 10-bit signed offset, imm[0] = 0)
+            uint8_t rd = (inst >> 6) & 0x7; // (link register for JAL)
+            int16_t imm3_1 = (inst >> 3) & 0x7; // (low 3 bits of offset)
+
+            int16_t imm = (imm9_4 << 3) | imm3_1; // combine immediates
+
+            // sign extend immedate if needed
+            if (imm & (1 << 8))
+                imm = imm | 0xFE00;
+
+            // calculate PC relative target address (PC + 2)
+            uint16_t target = pc + (imm * 2);
+
+            if (link_flag) // JAL
+                // x[rd] ← PC + 2; PC ← PC + offset
+                regs[rd] = pc + 2;
+
+            pc = target;
+            pcUpdated = 1;
         }
+
         case 0x6: { // U-type
-            // your code goes here
-            break;
+            uint8_t flag = (inst >> 15) & 0x1; // (0 = LUI, 1 = AUIPC)
+            int16_t imm15_10 = (inst >> 9) & 0x3F; // (high 6 bits of immediate)
+            uint8_t rd = (inst >> 6) & 0x7;
+            int16_t imm9_7 = (inst >> 3) & 0x7; // (mid 3 bits of immediate)
+
+            int16_t imm = (imm15_10 << 3) | imm9_7; // combine immediates
+
+            // sign extend immedate if needed
+            if (imm & (1 << 8))
+                imm = imm | 0xFE00;
+
+            // shift immediate to upper bits
+            imm = imm << 7;
+
+            if (flag) // AUIPC rd ← PC + (imm[15:7] << 7)
+                regs[rd] = pc + imm;
+            else // LUI rd ← (imm[15:7] << 7)
+                regs[rd] = imm;
         }
         case 0x7: { // System instruction (ecall)
-            // your code goes here
-            break;
+            uint16_t svc = (inst >> 6) & 0x3FF; // (10-bit system-call number)
+            uint8_t func3 = (inst >> 3) & 0x7; // 000
+            if (func3 == 0x0) {
+                if (svc == 0x0) // Print character syscall
+                    printf("%c", regs[6] & 0xFF); // a0 is in regs[6]
+                else if (svc == 0x1) // Read char into a0
+                    regs[6] = getchar() & 0xFF;
+                else if (svc == 0x2) // Print string syscall
+                    printf("%s", (char*)&memory[regs[6]]);
+                else if (svc == 0x3) // # Print decimal
+                    printf("%d", (int16_t)regs[6]);
+                else if (svc == 0x3FF) // Exit program syscall
+                    return 0;
+                else
+                    printf("Unknown ecall: 0x%03X\n", svc);
+            }
+            else
+                printf("Invalid system instruction: 0x%X\n", func3);
         }
+
         default:
             printf("Unknown instruction opcode 0x%X\n", opcode);
             break;

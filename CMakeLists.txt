@@ -3,4 +3,4 @@ project(zx16_simulator)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(zx16_simulator main.cpp)
+add_executable(zx16_simulator main.cpp z16sim.cpp)
