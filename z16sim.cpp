@@ -93,8 +93,8 @@ void z16sim::disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize) 
             uint8_t rd_rs1 = (inst >> 6) & 0x7;
             uint8_t funct3 = (inst >> 3) & 0x7;
 
-            if (funct3 == 0x0)
-                printf("addi %s, %d\n", regNames[rd_rs1], imm);
+                if (funct3 == 0x0)
+                    printf("addi %s, %d\n", regNames[rd_rs1], imm);
             else if (funct3 == 0x1)
                 printf("slti %s, %d\n", regNames[rd_rs1], imm);
             else if (funct3 == 0x2)
@@ -569,7 +569,7 @@ int z16sim::executeInstruction(uint16_t inst) {
 // Memory Loading
 // -----------------------
 //
-// Loads the binary machine code image from the specified file into simulated memory.
+//Loads the binary machine code image from the specified file into simulated memory.
 void z16sim::loadMemoryFromFile(const char *filename) {
     FILE *fp = fopen(filename, "rb");
     if(!fp) {
@@ -582,12 +582,20 @@ void z16sim::loadMemoryFromFile(const char *filename) {
 }
 
 bool z16sim::cycle() {
-    // Terminate if PC goes out of bounds
-    if(pc >= MEM_SIZE - 1) return 0;
+    // Terminate if PC goes out of bounds (this check is also in updatePC, but good for initial check)
+    if(pc >= MEM_SIZE - 1) {
+        printf("PC 0x%04X out of bounds at start of cycle.\n", pc);
+        return false;
+    }
 
     char disasmBuf[128];
 
     // Fetch a 16-bit instruction from memory (little-endian)
+    // Add bounds check for instruction fetch
+    if (pc + 1 >= MEM_SIZE) {
+        printf("Instruction fetch at 0x%04X would go out of bounds.\n", pc);
+        return false;
+    }
     uint16_t inst = memory[pc] | (memory[pc+1] << 8);
 
     disassemble(inst, pc, disasmBuf, sizeof(disasmBuf));
@@ -599,3 +607,27 @@ bool z16sim::cycle() {
 }
 
 
+bool z16sim::updatePC(uint16_t new_pc, const char* instruction_name)
+{
+    // Check if new PC is within valid memory bounds for instruction fetch
+    // An instruction is 2 bytes, so new_pc + 1 must be within MEM_SIZE.
+    if (new_pc >= MEM_SIZE - 1) {
+        printf("%s: PC 0x%04X out of bounds for next instruction fetch\n", instruction_name, new_pc);
+        return false;
+    }
+
+    // Check if PC is word-aligned (even address for 16-bit instructions)
+    if (new_pc & 0x1) {
+        printf("%s: PC 0x%04X not aligned to instruction boundary\n", instruction_name, new_pc);
+        return false;
+    }
+
+    // Check if trying to execute from MMIO region (0xF000-0xFFFF)
+    if (new_pc >= 0xF000) {
+        printf("%s: Cannot execute from MMIO region 0x%04X\n", instruction_name, new_pc);
+        return false;
+    }
+
+    pc = new_pc; // Update the class member pc
+    return true;
+}
