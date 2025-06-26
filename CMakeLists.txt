@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(zx16_simulator
         main.cpp
         z16sim.cpp
+        Test_driver.cpp
 )
 
 add_executable(zx16_simulator_tests
