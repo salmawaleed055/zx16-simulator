@@ -8,6 +8,7 @@ add_executable(zx16_simulator
         main.cpp
         z16sim.cpp
         Test_driver.cpp
+        create_test_bins.cpp
 )
 
 add_executable(zx16_simulator_tests

@@ -1,7 +1,8 @@
+Loaded 8 bytes into memory
 0x0000: 0A79    li x1, 5
 0x0002: 06B9    li x2, 3
 0x0004: 0440    add x1, x2
-0x0006: FFC7    ecall 0x3FF
+0x0006: FFC7    Unknown opcode
 
 --- Final State ---
 x0: 0x0000
@@ -12,6 +13,7 @@ x4: 0x0000
 x5: 0x0000
 a0: 0x0000
 a1: 0x0000
-PC: 0x0008
+PC: 0x0006
 ---------------------
+
 Simulation finished.

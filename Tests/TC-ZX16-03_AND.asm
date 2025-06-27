@@ -1,0 +1,7 @@
+# TC-ZX16-03_AND.s
+# Test Objective: Validate R-type AND instruction
+# x1 = x1 & x2 (0x3A & 0x2F = 0x2A)
+li x1, 0x3A # x1 = 0x003A
+li x2, 0x2F # x2 = 0x002F
+and x1, x2 # x1 = 0x003A & 0x002F = 0x002A
+ecall 0x3FF

@@ -1,0 +1,21 @@
+Loaded 12 bytes into memory
+0x0000: 1471    xori x1, 10
+0x0002: 14B1    xori x2, 10
+0x0004: 24C2    beq x3, x2, 0x0008
+0x0006: 0271    xori x1, 1
+0x0008: 0000    add x0, x0
+0x000A: FFC7    Unknown opcode
+
+--- Final State ---
+x0: 0x0000
+x1: 0x000b
+x2: 0x000a
+x3: 0x0000
+x4: 0x0000
+x5: 0x0000
+a0: 0x0000
+a1: 0x0000
+PC: 0x000a
+---------------------
+
+Simulation finished.

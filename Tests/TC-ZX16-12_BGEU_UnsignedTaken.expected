@@ -1,0 +1,18 @@
+0x0000: F679    li x1, 65531
+0x0002: 1471    li x2, 10
+0x0004: 24D2    bgeu x1, x2, 0x0008
+0x0008: 0271    li x1, 1
+0x000A: FFC7    ecall 0x3FF
+
+--- Final State ---
+x0: 0x0000
+x1: 0x0001
+x2: 0x000A
+x3: 0x0000
+x4: 0x0000
+x5: 0x0000
+a0: 0x0000
+a1: 0x0000
+PC: 0x000C
+---------------------
+Simulation finished.
