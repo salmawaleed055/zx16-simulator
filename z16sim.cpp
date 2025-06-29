@@ -33,7 +33,6 @@
 #include "z16sim.h"
 
 
-
 // constructor
 z16sim::z16sim() {
     std::memset(memory, 0, MEM_SIZE);
