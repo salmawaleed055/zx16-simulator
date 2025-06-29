@@ -6,6 +6,7 @@
 
 int main(int argc, char **argv) {
     z16sim sim;
+    bool debug = false;
 
     printf("If you only want to see the output without the instructions, press 1, otherwise; press 0\n");
     char option;
@@ -33,14 +34,14 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    sim.reset();  // resets memory and registers
+    sim.reset();
     sim.loadMemoryFromFile(argv[1]);
 
     while (sim.cycle()) {
         if (debug) {
             printf("Registers: ");
-            for (int i = 0; i < 8; ++i) {
-                printf("%s=0x%04X ", regNames[i], regs[i]);
+            for (int i = 0; i < z16sim::NUM_REGS; ++i) {
+                printf("%s=0x%04X ", z16sim::regNames[i], sim.getReg(i));
             }
             printf("\n");
         }

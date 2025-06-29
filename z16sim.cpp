@@ -1,6 +1,6 @@
 #include "z16sim.h"
 
-
+#define MEM_SIZE 65536  // 64KB memory
 uint16_t regs[8] = {0};
 uint16_t pc = 0;
 unsigned char memory[MEM_SIZE] = {0};
@@ -330,9 +330,9 @@ int z16sim::executeInstruction(uint16_t inst) {
                     regs[rd] ^= simm;
                 break;
                 case 0x7:
-                    printf("LI executed: x%d = %d\n", rd, simm);
-                regs[rd] = simm;
-                break;
+    printf("LI executed: x%d = %d\n", rd, simm);
+    regs[rd] = simm;
+    break;
 
                 default:
                     printf("Unknown I-type funct3: 0x%X\n", funct3);
