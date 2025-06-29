@@ -55,10 +55,24 @@
 #include <cstring>
 #include <cctype>
 #include <iostream> // For std::cout in case you use it for debugging within the class
+#define MEM_SIZE 65536
+extern uint16_t regs[8];
+extern uint16_t pc;
+extern unsigned char memory[MEM_SIZE];
+extern bool debug;
+extern const char* regNames[8];
+
+
+extern uint16_t regs[8];
+extern uint16_t pc;
+extern unsigned char memory[MEM_SIZE];
+extern int infinityCheck[];
+extern bool debug;
+extern const char* regNames[8];
 
 class z16sim {
 public:
-    static constexpr int MEM_SIZE = 65536;  // 64KB memory
+    //static constexpr int MEM_SIZE = 65536;  // 64KB memory
     static constexpr int NUM_REGS = 8;     // 8 registers
 
     // Register ABI names for display (made public for main.cpp access)
@@ -67,7 +81,7 @@ public:
     // If your registers are strictly "x0"..."x7", then please revert a0/a1 to x6/x7.
 
     z16sim();
-
+    void reset(); // declare reset function
     void loadMemoryFromFile(const char *filename);
     uint8_t memory[MEM_SIZE]; // Public for external test inspection if needed (e.g., verifying stores)
     bool cycle();
@@ -88,7 +102,7 @@ public:
         // else { std::cerr << "Error: Attempted to write to invalid register index " << (int)reg_idx << std::endl; }
     }
 
-private:
+
     uint16_t regs[NUM_REGS]; // 8 registers (16-bit each)
     uint16_t pc = 0;       // Program counter (16-bit)
 
