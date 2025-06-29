@@ -206,23 +206,30 @@ void z16sim::disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize) 
         //J-Type (opcode = 101)
         case 0x5: { // J-Type (jump): [15]link flag | [14:9] imm[9:4] | [8:6] rd | [5:3] imm[3:1] | [2:0] opcode
             uint8_t link_flag = (inst >> 15) & 0x1; // (0 = J, 1 = JAL)
-            int16_t imm9_4 = (inst >> 9) & 0x3F; // (high 6 bits of 10-bit signed offset, imm[0] = 0)
-            uint8_t rd = (inst >> 6) & 0x7; // (link register for JAL)
-            int16_t imm3_1 = (inst >> 3) & 0x7; // (low 3 bits of offset)
+            // int16_t imm9_4 = (inst >> 9) & 0x3F; // (high 6 bits of 10-bit signed offset, imm[0] = 0)
+            // uint8_t rd = (inst >> 6) & 0x7; // (link register for JAL)
+            // int16_t imm3_1 = (inst >> 3) & 0x7; // (low 3 bits of offset)
+            //
+            // int16_t imm = (imm9_4 << 3) | imm3_1; // combine immediates
+            //
+            // // sign extend immedate if needed
+            // if (imm & (1 << 8))
+            //     imm = imm | 0xFE00;
+            //
+            // // calculate PC relative target address (PC + 2)
+            // uint16_t target = pc + (imm * 2);
+            //
+            // if (link_flag) // JAL
+            //     snprintf(buf, bufSize,"jal %s, 0x%04X\n", regNames[rd], target);
+            // else // J
+            //     snprintf(buf, bufSize, "j 0x%04X\n", target);
+             uint16_t imm = ((inst >> 9) & 0x3F) << 3 | ((inst >> 3) & 0x7);
+             if (imm & 0x200) imm |= 0xFC00; // Sign-extend 10-bit
+             uint16_t target = pc + (imm << 1); // PC-relative
 
-            int16_t imm = (imm9_4 << 3) | imm3_1; // combine immediates
-
-            // sign extend immedate if needed
-            if (imm & (1 << 8))
-                imm = imm | 0xFE00;
-
-            // calculate PC relative target address (PC + 2)
-            uint16_t target = pc + (imm * 2);
-
-            if (link_flag) // JAL
-                snprintf(buf, bufSize,"jal %s, 0x%04X\n", regNames[rd], target);
-            else // J
-                snprintf(buf, bufSize, "j 0x%04X\n", target);
+             if (link_flag) snprintf(buf, bufSize, "jal x%d, 0x%04X", (inst>>6)&0x7, target);
+             else snprintf(buf, bufSize, "j 0x%04X", target);
+             break;
         }
 
         // U-Type (opcode = 110)
@@ -252,10 +259,11 @@ void z16sim::disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize) 
             uint16_t svc = (inst >> 6) & 0x3FF; // (10-bit system-call number)
             uint8_t func3 = (inst >> 3) & 0x7; // 000
 
-            if (func3 == 0x0)
-                snprintf(buf, bufSize, "ecall 0x%03X\n", svc);
-            else
-                snprintf(buf, bufSize, "Invalid SYS-Type instruction");
+             if (func3 == 0x0)
+                 snprintf(buf, bufSize, "ecall 0x%03X", svc);
+             else
+                 snprintf(buf, bufSize, "unknown SYS-type");
+             break;
         }
 
         default:
@@ -342,7 +350,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                     if (shift_type == 0x1) {      // SLLI
                         regs[rd] <<= shamt;
                     } else if (shift_type == 0x2) { // SRLI
-                        regs[rd] >>= shamt;
+                        regs[rd] = ((uint16_t)regs[rd]) >> shamt;
                     } else if (shift_type == 0x4) { // SRAI
                         regs[rd] = (int16_t)regs[rd] >> shamt;
                     }
@@ -359,6 +367,9 @@ int z16sim::executeInstruction(uint16_t inst) {
                 break;
                 case 0x7: // LI (Load Immediate — just write imm)
                     regs[rd] = simm;
+                break;
+                default:
+                    printf("Unknown I-type funct3: 0x%X\n", funct3);
                 break;
             }
 
@@ -545,11 +556,12 @@ int z16sim::executeInstruction(uint16_t inst) {
                     printf("%d", (int16_t)regs[6]);
                 else if (svc == 0x3FF) // Exit program syscall
                     return 0;
-                else
-                    printf("Unknown ecall: 0x%03X\n", svc);
+                break;
+                // else
+                //     printf("Unknown ecall: 0x%03X\n", svc);
+                // break;
             }
-            else
-                printf("Invalid system instruction: 0x%X\n", func3);
+            printf("Invalid system instruction: 0x%X\n", func3);
         }
 
         default:
