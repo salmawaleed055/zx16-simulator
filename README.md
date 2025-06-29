@@ -95,11 +95,4 @@ Registers: t0=0x0000 ra=0x0005 ...
 * Simulator accepts `.bin` machine code files (e.g., from an assembler)
 * Instructions are 16-bit and stored little-endian in memory
 
----
-Future Enhancements
-
-* [ ] Interrupt handling support
-* [ ] IO-mapped peripherals (keyboard, screen, etc.)
-* [ ] Compiler front-end or assembler
-* [ ] Better debugging GUI
 
