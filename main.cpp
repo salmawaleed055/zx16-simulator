@@ -1,11 +1,11 @@
 #include "z16sim.h"
-#include <iostream>
-#include <vector>
+#include <cstdio>
+#include <cstdlib>
+#include <cstdint>
+#include <cstring>
 #include <iomanip> // For std::hex, std::setw, std::setfill
 
-// Main entry point for the Z16 simulator executable
-int main(int argc, char* argv[])
-    {
+int main(int argc, char **argv) {
     // Check for correct command-line usage
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <machine_code_file_name.bin>" << std::endl;
@@ -36,4 +36,5 @@ int main(int argc, char* argv[])
 
     std::cout << "Simulation finished." << std::endl;
     return 0; // Indicate success
+
 }
