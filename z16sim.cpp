@@ -1,39 +1,12 @@
-/*
- * Z16 Instruction Set Simulator (ISS)
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at:
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * Author: Mohamed Shalan
- *
- * This simulator accepts a Z16 binary machine code file (with a .bin extension) and assumes that
- * the first instruction is located at memory address 0x0000. It decodes each 16-bit instruction into a
- * human-readable string and prints it, then executes the instruction by updating registers, memory,
- * or performing I/O via ecall.
- *
- * Supported ecall services:
- *   - ecall 1: Print an integer (value in register a0).
- *   - ecall 5: Print a NULL-terminated string (address in register a0).
- *   - ecall 3: Terminate the simulation.
- *
- * Usage:
- *   z16sim <machine_code_file_name>
- *
- */
-
 #include "z16sim.h"
 
+#define MEM_SIZE 65536  // 64KB memory
+uint16_t regs[8] = {0};
+uint16_t pc = 0;
+unsigned char memory[MEM_SIZE] = {0};
+bool debug = false;
+const char* regNames[8] = {"t0", "ra", "sp", "s0", "s1", "t1", "a0", "a1"};
 
-// constructor
 z16sim::z16sim() {
     std::memset(memory, 0, MEM_SIZE);
     std::memset(regs, 0, sizeof(regs));
@@ -204,56 +177,47 @@ void z16sim::disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize) 
 
 
         //J-Type (opcode = 101)
-        case 0x5: { // J-Type (jump): [15]link flag | [14:9] imm[9:4] | [8:6] rd | [5:3] imm[3:1] | [2:0] opcode
-            uint8_t link_flag = (inst >> 15) & 0x1; // (0 = J, 1 = JAL)
-            // int16_t imm9_4 = (inst >> 9) & 0x3F; // (high 6 bits of 10-bit signed offset, imm[0] = 0)
-            // uint8_t rd = (inst >> 6) & 0x7; // (link register for JAL)
-            // int16_t imm3_1 = (inst >> 3) & 0x7; // (low 3 bits of offset)
-            //
-            // int16_t imm = (imm9_4 << 3) | imm3_1; // combine immediates
-            //
-            // // sign extend immedate if needed
-            // if (imm & (1 << 8))
-            //     imm = imm | 0xFE00;
-            //
-            // // calculate PC relative target address (PC + 2)
-            // uint16_t target = pc + (imm * 2);
-            //
-            // if (link_flag) // JAL
-            //     snprintf(buf, bufSize,"jal %s, 0x%04X\n", regNames[rd], target);
-            // else // J
-            //     snprintf(buf, bufSize, "j 0x%04X\n", target);
-             uint16_t imm = ((inst >> 9) & 0x3F) << 3 | ((inst >> 3) & 0x7);
-             if (imm & 0x200) imm |= 0xFC00; // Sign-extend 10-bit
-             uint16_t target = pc + (imm << 1); // PC-relative
+        case 0x5: { //J type : [15] f | [14:9] imm[5:0] | [8:6] rd | [5:3] imm[8:6] | [2:0] opcode
+             uint8_t f = (inst >> 15) & 0x1;              // Extract 'f' (bit 15)
+             uint8_t imm9to4 = (inst >> 9) & 0x3F;        // Extract I[9:4] (bits 14:9)
+             uint8_t rd = (inst >> 6) & 0x7;              // Extract 'rd' (bits 8:6)
+             uint8_t imm3to1 = (inst >> 3) & 0x7;
 
-             if (link_flag) snprintf(buf, bufSize, "jal x%d, 0x%04X", (inst>>6)&0x7, target);
-             else snprintf(buf, bufSize, "j 0x%04X", target);
+             int16_t imm = (imm9to4 << 4) | (imm3to1 << 1);
+
+             // Sign extension
+             if (imm & 0x200) { // Check if bit 9 is set
+                 imm |= 0xFC00; // Sign extend to a full 16-bit value
+             }
+             // Scale by 2 for 16-bit instruction alignment
+
+             if (f == 0) {
+                 // Disassemble 'j' instruction
+                 printf("j %d\n", imm);
+             } else if (f == 1) {
+
+                 // Disassemble 'jal' instruction
+
+                 printf("jal %s, %d\n", regNames[rd], imm);
+             }
+             else
+                 printf("Unknown Instruction\n");
+
              break;
         }
 
+
         // U-Type (opcode = 110)
-        case 0x6: { // U-Type: [15] flag | [14:9] imm15_10 | [8:6] rd | [5:3] imm9_7 | [2:0] opcode
-            uint8_t flag = (inst >> 15) & 0x1; // (0 = LUI, 1 = AUIPC)
-            int16_t imm15_10 = (inst >> 9) & 0x3F; // (high 6 bits of immediate)
-            uint8_t rd = (inst >> 6) & 0x7;
-            int16_t imm9_7 = (inst >> 3) & 0x7; // (mid 3 bits of immediate)
-
-            int16_t imm = (imm15_10 << 3) | imm9_7; // combine immediates
-
-            // sign extend immedate if needed
-            if (imm & (1 << 8))
-                imm = imm | 0xFE00;
-
-            // shift immediate to upper bits
-            imm = imm << 7;
-
-            if (flag) // AUIPC
-                snprintf(buf, bufSize, "auipc %s, 0x%04X\n", regNames[rd], imm);
-            else // LUI
-                snprintf(buf, bufSize, "lui %s, 0x%04X\n", regNames[rd], imm);
+        case 0x6: { // U-Type
+             uint8_t f = (inst >> 15) & 0x1;
+             uint8_t rd  = (inst >> 6) & 0x7;
+             uint16_t I  = ((inst >> 3) & 0x7) | ((inst >> 6) & 0x1F8);
+             if(f==0)
+                 printf("lui %s, 0x%X\n", regNames[rd], I);    // prints the number in hexadecimal
+             else
+                 printf("auipc %s, 0x%X\n", regNames[rd], I);  // prints the number in hexadecimal
+             break;
         }
-
         // SYS-Type (opcode = 111)
         case 0x7: { // SYS-Type: [15:6] svc | [5:3] 000 | [2:0] opcode
             uint16_t svc = (inst >> 6) & 0x3FF; // (10-bit system-call number)
@@ -365,9 +329,11 @@ int z16sim::executeInstruction(uint16_t inst) {
                 case 0x6: // XORI
                     regs[rd] ^= simm;
                 break;
-                case 0x7: // LI (Load Immediate — just write imm)
-                    regs[rd] = simm;
-                break;
+                case 0x7:
+    printf("LI executed: x%d = %d\n", rd, simm);
+    regs[rd] = simm;
+    break;
+
                 default:
                     printf("Unknown I-type funct3: 0x%X\n", funct3);
                 break;
@@ -520,6 +486,8 @@ int z16sim::executeInstruction(uint16_t inst) {
 
             pc = target;
             pcUpdated = 1;
+            break;
+
         }
 
         case 0x6: { // U-type
@@ -540,7 +508,9 @@ int z16sim::executeInstruction(uint16_t inst) {
             if (flag) // AUIPC rd ← PC + (imm[15:7] << 7)
                 regs[rd] = pc + imm;
             else // LUI rd ← (imm[15:7] << 7)
-                regs[rd] = imm;
+            regs[rd] = imm;
+            break;
+
         }
         case 0x7: { // System instruction (ecall)
             uint16_t svc = (inst >> 6) & 0x3FF; // (10-bit system-call number)
@@ -562,6 +532,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                 // break;
             }
             printf("Invalid system instruction: 0x%X\n", func3);
+            break;
         }
 
         default:
@@ -625,6 +596,12 @@ bool z16sim::cycle() {
 
     return true; // Continue execution
 }
+void z16sim::reset() {
+    for (int i = 0; i < 8; ++i)
+        regs[i] = 0;
+    pc = 0;
+}
+
 
 bool z16sim::updatePC(uint16_t new_pc, const char* instruction_name)
 {
@@ -650,3 +627,4 @@ bool z16sim::updatePC(uint16_t new_pc, const char* instruction_name)
     pc = new_pc; // Update the class member pc
     return true;
 }
+

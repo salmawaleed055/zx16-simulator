@@ -5,15 +5,16 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(zx16_simulator
-        main.cpp
+
         z16sim.cpp
-        Test_driver.cpp
-        create_test_bins.cpp
+        main.cpp
 )
 
 add_executable(zx16_simulator_tests
         Tests.cpp
         z16sim.cpp
+        Test_driver.cpp
+        create_test_bins.cpp
 )
 
 target_compile_options(zx16_simulator PRIVATE -Wall -Wextra -pedantic)
