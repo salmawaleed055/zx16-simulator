@@ -37,12 +37,13 @@ public:
     }
 
     uint8_t memory[MEM_SIZE]; // Public for inspection during testing
+    void disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize);
 
 private:
     uint16_t regs[NUM_REGS] = {0};
     uint16_t pc = 0;
 
-    void disassemble(uint16_t inst, uint16_t pc, char *buf, size_t bufSize);
+
     int executeInstruction(uint16_t inst);
     bool updatePC(uint16_t new_pc, const char* instruction_name);
 };

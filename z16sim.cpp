@@ -330,7 +330,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                     regs[rd] ^= simm;
                 break;
                 case 0x7:
-    printf("LI executed: x%d = %d\n", rd, simm);
+    // printf("LI executed: x%d = %d\n", rd, simm);
     regs[rd] = simm;
     break;
 
