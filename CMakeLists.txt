@@ -7,7 +7,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(zx16_simulator
 
         z16sim.cpp
-        main.cpp
 )
 
 add_executable(zx16_simulator_tests
