@@ -9,6 +9,9 @@
 #include <algorithm>
 #include <cctype>
 
+
+
+
 const char* z16sim::regNames[z16sim::NUM_REGS] = {"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"};
 
 // z16sim Constructor
@@ -628,81 +631,117 @@ void printUsage(const char* progName) {
     std::cerr << "  -i: Interactive mode (single-stepping)" << std::endl;
 }
 
-int main(int argc, char* argv[]) {
-    bool interactive = false;
-    const char* filename = nullptr;
+// int main(int argc, char* argv[]) {
+//     bool interactive = false;
+//     const char* filename = nullptr;
+//
+//     // Parse command line arguments
+//     if (argc == 2) {
+//         // Normal mode: just filename
+//         filename = argv[1];
+//     } else if (argc == 3) {
+//         // Check if first argument is -i
+//         if (std::string(argv[1]) == "-i") {
+//             interactive = true;
+//             filename = argv[2];
+//         } else {
+//             printUsage(argv[0]);
+//             return 1;
+//         }
+//     } else {
+//         printUsage(argv[0]);
+//         return 1;
+//     }
+//
+//     z16sim simulator; // Create an instance of the simulator
+//
+//     // Load the machine code binary from the specified file
+//     simulator.loadMemoryFromFile(filename);
+//
+//     if (interactive) {
+//         std::cout << "Interactive mode enabled. Press ENTER to execute next instruction, 'q' then ENTER to quit." << std::endl;
+//         std::cout << "Initial state:" << std::endl;
+//         simulator.dumpRegisters();
+//         std::cout << "PC: 0x" << std::hex << std::setw(4) << std::setfill('0')
+//                   << simulator.getPC() << std::endl;
+//         std::cout << std::endl;
+//
+//         // Interactive simulation
+//         while (true) {
+//             std::cout << "--- Press ENTER to continue (q then ENTER to quit): ";
+//             std::cout.flush();
+//
+//             std::string line;
+//             std::getline(std::cin, line); // Read the whole line
+//
+//             if (line == "q" || line == "Q") {
+//                 std::cout << "Simulation terminated by user." << std::endl;
+//                 break;
+//             }
+//
+//             // Execute one instruction
+//             if (!simulator.cycle()) {
+//                 std::cout << "Simulation terminated by instruction." << std::endl;
+//                 break;
+//             }
+//
+//             // Dump register state
+//             simulator.dumpRegisters();
+//             std::cout << "PC: 0x" << std::hex << std::setw(4) << std::setfill('0')
+//                       << simulator.getPC() << std::endl;
+//             std::cout << std::endl;
+//         }
+//     } else {
+//         // Normal simulation mode
+//         while (simulator.cycle()) {
+//             // Continue simulation as long as cycle() returns true
+//         }
+//     }
+//
+//     // Final register state
+//     std::cout << "\n--- Final State ---" << std::endl;
+//     simulator.dumpRegisters();
+//     std::cout << "PC: 0x" << std::hex << std::setw(4) << std::setfill('0')
+//               << simulator.getPC() << std::endl;
+//     std::cout << "---------------------\n" << std::endl;
+//
+//     std::cout << "Simulation finished." << std::endl;
+//     return 0;
+// }
 
-    // Parse command line arguments
-    if (argc == 2) {
-        // Normal mode: just filename
-        filename = argv[1];
-    } else if (argc == 3) {
-        // Check if first argument is -i
-        if (std::string(argv[1]) == "-i") {
-            interactive = true;
-            filename = argv[2];
-        } else {
-            printUsage(argv[0]);
-            return 1;
-        }
-    } else {
-        printUsage(argv[0]);
-        return 1;
+#include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
+
+int main() {
+    // Window
+    sf::RenderWindow window(sf::VideoMode(800, 600), "ZX16 Simulator");
+
+    // Sound (no external file needed)
+    sf::SoundBuffer buffer;
+    sf::Int16 samples[44100];
+    for (int i = 0; i < 44100; i++) {
+        samples[i] = 30000 * sin(i * 0.1); // 440Hz beep
     }
+    buffer.loadFromSamples(samples, 44100, 1, 44100);
+    sf::Sound sound(buffer);
 
-    z16sim simulator; // Create an instance of the simulator
-
-    // Load the machine code binary from the specified file
-    simulator.loadMemoryFromFile(filename);
-
-    if (interactive) {
-        std::cout << "Interactive mode enabled. Press ENTER to execute next instruction, 'q' then ENTER to quit." << std::endl;
-        std::cout << "Initial state:" << std::endl;
-        simulator.dumpRegisters();
-        std::cout << "PC: 0x" << std::hex << std::setw(4) << std::setfill('0')
-                  << simulator.getPC() << std::endl;
-        std::cout << std::endl;
-
-        // Interactive simulation
-        while (true) {
-            std::cout << "--- Press ENTER to continue (q then ENTER to quit): ";
-            std::cout.flush();
-
-            std::string line;
-            std::getline(std::cin, line); // Read the whole line
-
-            if (line == "q" || line == "Q") {
-                std::cout << "Simulation terminated by user." << std::endl;
-                break;
+    // Main loop
+    while (window.isOpen()) {
+        sf::Event e;
+        while (window.pollEvent(e)) {
+            if (e.type == sf::Event::Closed)
+                window.close();
+            if (e.type == sf::Event::KeyPressed && e.key.code == sf::Keyboard::Space) {
+                sound.play(); // Test audio
             }
-
-            // Execute one instruction
-            if (!simulator.cycle()) {
-                std::cout << "Simulation terminated by instruction." << std::endl;
-                break;
-            }
-
-            // Dump register state
-            simulator.dumpRegisters();
-            std::cout << "PC: 0x" << std::hex << std::setw(4) << std::setfill('0')
-                      << simulator.getPC() << std::endl;
-            std::cout << std::endl;
         }
-    } else {
-        // Normal simulation mode
-        while (simulator.cycle()) {
-            // Continue simulation as long as cycle() returns true
-        }
+
+        // Clear screen and draw a red square
+        window.clear();
+        sf::RectangleShape rect(sf::Vector2f(100, 100));
+        rect.setFillColor(sf::Color::Red);
+        window.draw(rect);
+        window.display();
     }
-
-    // Final register state
-    std::cout << "\n--- Final State ---" << std::endl;
-    simulator.dumpRegisters();
-    std::cout << "PC: 0x" << std::hex << std::setw(4) << std::setfill('0')
-              << simulator.getPC() << std::endl;
-    std::cout << "---------------------\n" << std::endl;
-
-    std::cout << "Simulation finished." << std::endl;
     return 0;
 }
-

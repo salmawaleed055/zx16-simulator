@@ -23,10 +23,6 @@ private:
     static const char* regNames[NUM_REGS];
     std::unordered_map<std::string, int> regMap;
 
-    // Assembler support
-    std::unordered_map<std::string, uint16_t> labels;
-    std::vector<std::pair<uint16_t, std::string> > unresolved_labels; // (address, label_name)
-
     // Helper methods
     void initializeRegisterMap();
     int getRegisterIndex(const std::string& regName);
@@ -43,6 +39,8 @@ public:
     void disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t bufSize);
     uint16_t getPC() const { return pc; }
     void setDebug(bool d) { debug = d; }
+
+
 };
 
 #endif // Z16SIM_H
