@@ -1,13 +1,13 @@
 Loaded 8 bytes into memory
-0x0000: F671    xori x1, -5
-0x0002: FC79    li x1, -2
-0x0004: FE49    slti x1, -1
-0x0006: FFC7    Unknown opcode
+0x0000: 0A79    li x1, 5
+0x0002: 06B9    li x2, 3
+0x0004: 0440    add x1, x2
+0x0006: FFC7    ecall 0x3FF
 
 --- Final State ---
 x0: 0x0000
-x1: 0x0001
-x2: 0x0000
+x1: 0x0008
+x2: 0x0003
 x3: 0x0000
 x4: 0x0000
 x5: 0x0000
