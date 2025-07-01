@@ -9,6 +9,9 @@
 #include <algorithm>
 #include <cctype>
 
+
+
+
 const char* z16sim::regNames[z16sim::NUM_REGS] = {"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"};
 
 // z16sim Constructor
@@ -17,7 +20,158 @@ z16sim::z16sim() {
     std::memset(this->regs, 0, sizeof(this->regs));
     this->pc = 0x0000;
     this->debug = false;
+
+    // Initialize graphics memory
+    memset(tileMap, 0, sizeof(tileMap));
+    memset(tileData, 0, sizeof(tileData));
+    memset(colorPalette, 0, sizeof(colorPalette));
+    memset(frameBuffer, 0, sizeof(frameBuffer));
+    screenNeedsUpdate = true;
+    graphicsInitialized = false;
+    graphicsMemoryAccessed = false;
+
     initializeRegisterMap();
+}
+
+void z16sim::initGraphics() {
+    if (graphicsInitialized) return;
+
+    // Create window
+    window.create(sf::VideoMode(640, 480), "ZX16 Simulator");
+    window.setFramerateLimit(60);
+    
+    // Create texture for screen
+    screenTexture.create(320, 240);
+    screenSprite.setTexture(screenTexture);
+    screenSprite.setScale(2.0f, 2.0f); // 2x scale for visibility
+    
+    // Initialize default palette
+    colorPalette[0] = 0x00;   // Black
+    colorPalette[1] = 0x1C;   // Red
+    colorPalette[2] = 0xE0;   // Green
+    colorPalette[3] = 0xFC;   // Yellow
+    colorPalette[4] = 0x03;   // Blue
+    colorPalette[5] = 0x1F;   // Magenta
+    colorPalette[6] = 0xE3;   // Cyan
+    colorPalette[7] = 0xFF;   // White
+    
+    graphicsInitialized = true;
+
+    std::cout << "SFML Graphics initialized: 320x240 display (scaled 2x)" << std::endl;
+}
+
+
+void z16sim::updateGraphicsMemory(uint16_t addr, uint8_t value) {
+    if (!graphicsMemoryAccessed) {
+        graphicsMemoryAccessed = true;
+        initGraphics();
+    }
+        if (addr >= 0xF000 && addr <= 0xF12B) {
+        // Tile map update
+        tileMap[addr - 0xF000] = value;
+        screenNeedsUpdate = true;
+    }
+    else if (addr >= 0xF200 && addr <= 0xF9FF) {
+        // Tile data update
+        int tileIndex = (addr - 0xF200) / 128;
+        int byteOffset = (addr - 0xF200) % 128;
+        if (tileIndex < 16) {
+            tileData[tileIndex][byteOffset] = value;
+            screenNeedsUpdate = true;
+        }
+    }
+    else if (addr >= 0xFA00 && addr <= 0xFA0F) {
+        // Color palette update
+        colorPalette[addr - 0xFA00] = value;
+        screenNeedsUpdate = true;
+    }
+}
+
+sf::Color z16sim::paletteToColor(uint8_t colorIndex) {
+    if (colorIndex >= 16) colorIndex = 0;
+    
+    uint8_t colorByte = colorPalette[colorIndex];
+    uint8_t r = ((colorByte >> 5) & 0x7) * 36;  // 3 bits -> 0-255
+    uint8_t g = ((colorByte >> 2) & 0x7) * 36;  // 3 bits -> 0-255
+    uint8_t b = (colorByte & 0x3) * 85;         // 2 bits -> 0-255
+    
+    return sf::Color(r, g, b);
+}
+
+void z16sim::renderTile(int tileIndex, int screenX, int screenY) {
+    if (tileIndex >= 16) return;
+    
+    for (int y = 0; y < 16; y++) {
+        for (int x = 0; x < 16; x += 2) {
+            int byteIndex = y * 8 + x / 2;
+            uint8_t pixelPair = tileData[tileIndex][byteIndex];
+            
+            uint8_t pixel0Color = pixelPair & 0x0F;
+            uint8_t pixel1Color = (pixelPair >> 4) & 0x0F;
+            
+            sf::Color color0 = paletteToColor(pixel0Color);
+            sf::Color color1 = paletteToColor(pixel1Color);
+            
+            // Set pixels in frame buffer
+            int fbIndex0 = ((screenY + y) * 320 + (screenX + x)) * 4;
+            int fbIndex1 = ((screenY + y) * 320 + (screenX + x + 1)) * 4;
+            
+            if (fbIndex0 < 320 * 240 * 4) {
+                frameBuffer[fbIndex0] = color0.r;
+                frameBuffer[fbIndex0 + 1] = color0.g;
+                frameBuffer[fbIndex0 + 2] = color0.b;
+                frameBuffer[fbIndex0 + 3] = 255;
+            }
+            
+            if (fbIndex1 < 320 * 240 * 4) {
+                frameBuffer[fbIndex1] = color1.r;
+                frameBuffer[fbIndex1 + 1] = color1.g;
+                frameBuffer[fbIndex1 + 2] = color1.b;
+                frameBuffer[fbIndex1 + 3] = 255;
+            }
+        }
+    }
+}
+
+void z16sim::renderScreen() {
+    if (!screenNeedsUpdate) return;
+    
+    // Clear frame buffer
+    memset(frameBuffer, 0, sizeof(frameBuffer));
+    
+    // Render each tile position
+    for (int row = 0; row < 15; row++) {
+        for (int col = 0; col < 20; col++) {
+            int tileMapIndex = row * 20 + col;
+            uint8_t tileIndex = tileMap[tileMapIndex];
+            renderTile(tileIndex, col * 16, row * 16);
+        }
+    }
+    
+    // Update SFML texture
+    screenTexture.update(frameBuffer);
+    screenNeedsUpdate = false;
+}
+
+bool z16sim::handleEvents() {
+    sf::Event event;
+    while (window.pollEvent(event)) {
+        if (event.type == sf::Event::Closed) {
+            return false;
+        }
+        if (event.type == sf::Event::KeyPressed) {
+            if (event.key.code == sf::Keyboard::Escape) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void z16sim::cleanup() {
+    if (window.isOpen()) {
+        window.close();
+    }
 }
 
 int z16sim::getRegisterIndex(const std::string& regName) {
@@ -282,6 +436,9 @@ int z16sim::executeInstruction(uint16_t inst) {
                 return 4; // Memory access error
             }
 
+            if (mem_addr >= 0xF000 && mem_addr <= 0xFA0F)
+                updateGraphicsMemory(mem_addr, data_val & 0xFF);
+
             if (funct3 == 0x0) { // sb (store byte)
                 this->memory[mem_addr] = (unsigned char)(data_val & 0xFF);
             } else if (funct3 == 0x1) { // sw (store word)
@@ -291,10 +448,14 @@ int z16sim::executeInstruction(uint16_t inst) {
                 }
                 this->memory[mem_addr] = (unsigned char)(data_val & 0xFF);
                 this->memory[mem_addr + 1] = (unsigned char)((data_val >> 8) & 0xFF);
+
+                if (mem_addr >= 0xF000 && mem_addr <= 0xFA0F)
+                    updateGraphicsMemory(mem_addr + 1, (data_val >> 8) & 0xFF);
             } else {
                 std::cerr << "Unknown S-type instruction: 0x" << std::hex << inst << " at PC: 0x" << this->pc << std::endl;
                 return 2;
             }
+
             this->pc += 2;
             break;
         }
@@ -582,7 +743,7 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
             if (imm & 0x200) imm |= 0xFC00; // Proper sign-extension for 10-bit
 
             int16_t signed_offset = (int16_t)imm; // Interpret as signed
-            uint16_t target_addr = this->pc + signed_offset;
+            uint16_t target_addr = current_pc + signed_offset;
 
 
             if (f == 0)
@@ -634,10 +795,8 @@ int main(int argc, char* argv[]) {
 
     // Parse command line arguments
     if (argc == 2) {
-        // Normal mode: just filename
         filename = argv[1];
     } else if (argc == 3) {
-        // Check if first argument is -i
         if (std::string(argv[1]) == "-i") {
             interactive = true;
             filename = argv[2];
@@ -650,9 +809,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    z16sim simulator; // Create an instance of the simulator
-
-    // Load the machine code binary from the specified file
+    z16sim simulator;
     simulator.loadMemoryFromFile(filename);
 
     if (interactive) {
@@ -663,26 +820,34 @@ int main(int argc, char* argv[]) {
                   << simulator.getPC() << std::endl;
         std::cout << std::endl;
 
-        // Interactive simulation
         while (true) {
+            // Handle SFML events
+            if (simulator.needsGraphics() && !simulator.handleEvents()) break;
+            
             std::cout << "--- Press ENTER to continue (q then ENTER to quit): ";
             std::cout.flush();
 
             std::string line;
-            std::getline(std::cin, line); // Read the whole line
+            std::getline(std::cin, line);
 
             if (line == "q" || line == "Q") {
                 std::cout << "Simulation terminated by user." << std::endl;
                 break;
             }
 
-            // Execute one instruction
             if (!simulator.cycle()) {
                 std::cout << "Simulation terminated by instruction." << std::endl;
                 break;
             }
 
-            // Dump register state
+            // Update graphics
+            if (simulator.needsGraphics()) {
+            simulator.renderScreen();
+            simulator.window.clear();
+            simulator.window.draw(simulator.screenSprite);
+            simulator.window.display();
+            }
+
             simulator.dumpRegisters();
             std::cout << "PC: 0x" << std::hex << std::setw(4) << std::setfill('0')
                       << simulator.getPC() << std::endl;
@@ -690,11 +855,47 @@ int main(int argc, char* argv[]) {
         }
     } else {
         // Normal simulation mode
-        while (simulator.cycle()) {
-            // Continue simulation as long as cycle() returns true
-        }
-    }
+        bool programRunning = true;
 
+        while (programRunning) {
+            if (simulator.needsGraphics())
+                    if (!simulator.handleEvents()) break;
+            
+            // Run simulator cycle
+            if (!simulator.cycle()) {
+                programRunning = false;
+                std::cout << "Program execution completed."
+                << std::endl;
+            
+                if (simulator.needsGraphics()) {
+                    while (simulator.window.isOpen()) {
+                        if (!simulator.handleEvents()) break;
+
+                        simulator.renderScreen();
+                        simulator.window.clear();
+                        simulator.window.draw(simulator.screenSprite);
+                        simulator.window.display();
+            
+                        sf::sleep(sf::milliseconds(16)); // ~60 FPS
+                    }
+                }
+
+                break;
+            }
+
+
+            if (simulator.needsGraphics()) {
+                simulator.renderScreen();
+                simulator.window.clear();
+                simulator.window.draw(simulator.screenSprite);
+                simulator.window.display();
+                sf::sleep(sf::milliseconds(16)); // ~60 FPS
+            }
+
+        }
+
+    }
+    
     // Final register state
     std::cout << "\n--- Final State ---" << std::endl;
     simulator.dumpRegisters();
@@ -702,7 +903,7 @@ int main(int argc, char* argv[]) {
               << simulator.getPC() << std::endl;
     std::cout << "---------------------\n" << std::endl;
 
+    simulator.cleanup();
     std::cout << "Simulation finished." << std::endl;
     return 0;
 }
-

@@ -37,7 +37,7 @@ int main() {
         // ecall 0x3FF
         0xFFC7
     };
-    createBinFile("tests/TC-ZX16-03_AND.bin", tc_03_and_insts);
+    createBinFile("tests_new/graphics_test.bin", tc_03_and_insts);
 
     std::cout << "\nAll binary test files generated." << std::endl;
     return 0;
