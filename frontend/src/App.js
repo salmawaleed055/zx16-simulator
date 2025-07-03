@@ -27,7 +27,7 @@ function App() {
     setGraphicsStatus(null);
 
     try {
-      const response = await fetch('http://localhost:5000/simulate', {  // <-- changed here
+      const response = await fetch('http://localhost:5001/simulate', {
         method: 'POST',
         body: formData,
       });

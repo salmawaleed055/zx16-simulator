@@ -6,7 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Your executables
 add_executable(zx16_simulator z16sim.cpp)
-add_executable(Create_Test_bins z16sim.cpp create_test_bins.cpp)
+add_executable(Create_Test_bins z16sim.cpp create_test_bins.cpp
+        backend/z16sim.cpp)
 add_executable(zx16_simulator_tests Tests.cpp z16sim.cpp)
 add_executable(zx16_simulator_tests_2 z16sim.cpp)
 
