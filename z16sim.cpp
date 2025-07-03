@@ -156,7 +156,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                 this->regs[rs1_rd] = val1 ^ val2;
                 this->pc += 2;
             }
-            else if (funct4 == 0xA && funct3 == 0x7) { // mv (move)
+            else if (funct3 == 0x7) { // mv (move)
                 this->regs[rs1_rd] = this->regs[rs2]; // rs1_rd is RD, rs2 is RS
                 this->pc += 2;
             }
@@ -448,10 +448,10 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
                 snprintf(buf, bufSize, "or %s, %s, %s", regNames[rd_rs1], regNames[rd_rs1], regNames[rs2]);
             else if (funct4 == 0x8 && funct3 == 0x5)
                 snprintf(buf, bufSize, "and %s, %s, %s", regNames[rd_rs1], regNames[rd_rs1], regNames[rs2]);
-            else if (funct4 == 0x9 && funct3 == 0x6)
-                snprintf(buf, bufSize, "xor %s, %s, %s", regNames[rd_rs1], regNames[rd_rs1], regNames[rs2]);
-            else if (funct4 == 0xA && funct3 == 0x7) // mv rd, rs
-                snprintf(buf, bufSize, "mv %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if (funct3 == 0x6)
+                printf("xor %s, %s\n", regNames[rd_rs1], regNames[rs2]);
+            else if (funct3 == 0x7)
+                printf("mv %s, %s\n", regNames[rd_rs1], regNames[rs2]);
             else if (funct4 == 0xB && funct3 == 0x0)
                 snprintf(buf, bufSize, "jr %s", regNames[rd_rs1]);
             else if (funct4 == 0xC && funct3 == 0x0)
