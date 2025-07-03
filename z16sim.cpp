@@ -582,7 +582,7 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
             if (imm & 0x200) imm |= 0xFC00; // Proper sign-extension for 10-bit
 
             int16_t signed_offset = (int16_t)imm; // Interpret as signed
-            uint16_t target_addr = this->pc + signed_offset;
+            uint16_t target_addr = current_pc + signed_offset;
 
 
             if (f == 0)
@@ -705,4 +705,3 @@ int main(int argc, char* argv[]) {
     std::cout << "Simulation finished." << std::endl;
     return 0;
 }
-
