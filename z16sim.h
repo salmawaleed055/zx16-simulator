@@ -49,16 +49,18 @@
 #ifndef Z16SIM_H
 #define Z16SIM_H
 
-#include <SFML/Graphics.hpp>
+//#include <SFML/Graphics.hpp>
 #include <unordered_map>
 #include <string>
 #include <cstdint>
+#define TILE_ROWS 15
+#define TILE_COLS 20
 
 class z16sim {
 public:
     static const int MEM_SIZE = 65536;
     static const int NUM_REGS = 8;
-    
+
     z16sim();
     void loadMemoryFromFile(const char* filename);
     bool cycle();
@@ -66,20 +68,22 @@ public:
     void dumpRegisters() const;
     void reset();
     uint16_t getPC() const { return pc; }
-    
+    std::pair<char, char> getTileColor(uint8_t paletteByte);
     // Graphics methods
     void initGraphics();
     void updateGraphicsMemory(uint16_t addr, uint8_t value);
     void renderScreen();
     void renderTile(int tileIndex, int screenX, int screenY);
-    sf::Color paletteToColor(uint8_t colorIndex);
+    char pixelToChar(uint8_t color);
+   // sf::Color paletteToColor(uint8_t colorIndex);
     void cleanup();
     bool handleEvents();
     bool needsGraphics() const { return graphicsMemoryAccessed; }
-    
+
+
     // Public for main loop access
-    sf::RenderWindow window;
-    sf::Sprite screenSprite;
+   // sf::RenderWindow window;
+   // sf::Sprite screenSprite;
 
 private:
     unsigned char memory[MEM_SIZE];
@@ -88,18 +92,18 @@ private:
     bool debug;
     static const char* regNames[NUM_REGS];
     std::unordered_map<std::string, int> regMap;
-    
+
     // Graphics members
-    sf::Texture screenTexture;
-    
-    sf::Uint8 frameBuffer[320 * 240 * 4]; // RGBA pixels
+    //sf::Texture screenTexture;
+
+    //sf::Uint8 frameBuffer[320 * 240 * 4]; // RGBA pixels
     uint8_t tileMap[300];                  // 20x15 tiles
     uint8_t tileData[16][128];             // 16 tiles, 128 bytes each
     uint8_t colorPalette[16];              // 16 colors
     bool screenNeedsUpdate;
     bool graphicsInitialized;
     bool graphicsMemoryAccessed;
-    
+
     void initializeRegisterMap();
     int getRegisterIndex(const std::string& regName);
     bool updatePC(uint16_t new_pc, const char* instruction_name);
