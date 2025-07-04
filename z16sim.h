@@ -40,6 +40,14 @@ public:
     uint16_t getPC() const { return pc; }
     void setDebug(bool d) { debug = d; }
     void setPC(uint16_t new_pc) { this->pc = new_pc; } // Add this line
+    // New setters
+    void setDebug(bool val);
+    void setVerbose(bool val);
+
+    // Optional getters (if needed)
+    bool isDebug() const;
+    bool isVerbose() const;
+
 
 };
 

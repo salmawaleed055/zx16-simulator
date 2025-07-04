@@ -7,6 +7,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState('');
   const [graphicsStatus, setGraphicsStatus] = useState(null);
+  const [clicked, setClicked] = useState(false);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -56,6 +57,13 @@ function App() {
     setGraphicsStatus(null);
   };
 
+  const handleGetStartedClick = () => {
+    setClicked(true);
+    setTimeout(() => {
+      window.location.href = 'simulate.html';
+    }, 150); // Wait for animation before navigating
+  };
+
   return (
       <div className="disassembler-container">
         <h2>⚙️ ZX16 Simulator Interface</h2>
@@ -91,6 +99,15 @@ function App() {
           {simOutput}
         </pre>
         )}
+
+        {/* 🔘 Get Started Button */}
+        <button
+            className={`btn btn-primary ${clicked ? 'clicked' : ''}`}
+            onClick={handleGetStartedClick}
+            style={{ marginTop: '2rem' }}
+        >
+          🚀 Get Started
+        </button>
       </div>
   );
 }
