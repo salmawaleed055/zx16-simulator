@@ -1,0 +1,53 @@
+Test case1: 5
+
+Test case2: 0
+
+Test case3: 2
+
+Test case4: 256
+            test
+            12
+            256
+            12
+            12
+            195
+            2
+
+Test case5: 42
+            -16
+            240
+            23
+
+Test case6: 1
+            0
+
+Test case7: 6
+
+Test case8: 5
+            1
+            159
+
+
+Test case9: 0
+            1
+            -5
+            20
+
+Test case10:3
+            1
+            142
+            142
+
+Test case11:less
+            less_unsigned
+            branch_not_taken
+
+Test case12: less
+             branch_not_taken
+
+Test case13: -5
+             branch_taken
+
+
+
+

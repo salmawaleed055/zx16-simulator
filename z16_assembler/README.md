@@ -801,7 +801,7 @@ Statistics:
 ### Basic Usage
 ```bash
 zx16asm input.asm                           # Default binary output
-zx16asm input.asm -o output.bin            # Specify output file
+zx16asm input.asm -o output2_.bin            # Specify output file
 zx16asm input.asm -f hex -o output.hex     # Intel HEX format
 zx16asm input.asm -f verilog -o output.v   # Verilog module
 zx16asm input.asm -f mem -o output.mem     # Memory file

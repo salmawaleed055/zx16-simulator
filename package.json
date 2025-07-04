@@ -1,0 +1,27 @@
+{
+  "name": "zx16-simulator",
+  "version": "1.0.0",
+  "description": "**ZX16 Instruction Set Simulator** that emulates a custom **RISC-based CPU architecture**, supporting:",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/salmawaleed055/zx16-simulator.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/salmawaleed055/zx16-simulator/issues"
+  },
+  "homepage": "https://github.com/salmawaleed055/zx16-simulator#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "multer": "^2.0.1"
+  }
+}
