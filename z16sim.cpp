@@ -628,7 +628,11 @@ void printUsage(const char* progName) {
     std::cerr << "Usage: " << progName << " [-i] <machine_code_file_name.bin>" << std::endl;
     std::cerr << "  -i: Interactive mode (single-stepping)" << std::endl;
 }
+<<<<<<< Updated upstream
 =======
+=======
+
+>>>>>>> Stashed changes
 int main(int argc, char **argv) {
     z16sim simulator; // Create an instance of your simulator
     bool interactive_mode = false;
@@ -687,11 +691,15 @@ int main(int argc, char* argv[]) {
             // Loop continues as long as simulator.cycle() returns true (not halted)
         }
         std::cout << "Full simulation finished." << std::endl;
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 
     // Load the machine code binary from the specified file
     simulator.loadMemoryFromFile(filename);
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
     if (interactive) {
         std::cout << "Interactive mode enabled. Press ENTER to execute next instruction, 'q' then ENTER to quit." << std::endl;
@@ -701,6 +709,8 @@ int main(int argc, char* argv[]) {
                   << simulator.getPC() << std::endl;
         std::cout << std::endl;
 =======
+=======
+>>>>>>> Stashed changes
         std::cout << "Starting interactive simulation." << std::endl;
         simulator.dumpRegisters(); // Print initial state of registers
 >>>>>>> Stashed changes
@@ -747,12 +757,16 @@ int main(int argc, char* argv[]) {
                       << simulator.getPC() << std::endl;
             std::cout << std::endl;
         }
+<<<<<<< Updated upstream
     } else {
         // Normal simulation mode
         while (simulator.cycle()) {
             // Continue simulation as long as cycle() returns true
         }
 <<<<<<< Updated upstream
+=======
+        std::cout << "Interactive simulation finished." << std::endl;
+>>>>>>> Stashed changes
 =======
         std::cout << "Interactive simulation finished." << std::endl;
 >>>>>>> Stashed changes
