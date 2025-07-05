@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Z16 Simulator Upload</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="Simulate.css" />
+</head>
+<body>
+<div class="bg-pattern"></div>
+<div class="floating-elements">
+    <div class="floating-circle"></div>
+    <div class="floating-circle"></div>
+    <div class="floating-circle"></div>
+</div>
+
+<div class="container">
+    <button class="btn btn-primary" onclick="animateClick(this); window.location.href='index.html'">
+        <img src="home-page.png" alt="Home" style="height: 20px; margin-right: 8px; vertical-align: middle;" />
+        Return Home
+    </button>
+
+    <h1>Run Z16 Simulation</h1>
+
+    <div class="upload-box">
+        <label for="binfile">Choose a .bin file:</label>
+        <input type="file" id="binfile" accept=".bin" />
+
+        <button class="btn btn-primary" onclick="animateClick(this); submitBinary()">
+            <img src="screen.png" alt="search icon" style="height: 20px; margin-right: 8px; vertical-align: middle;" />
+            Run Full Simulation
+        </button>
+
+        <button id="stepByStepBtn" class="btn btn-primary">
+            <img src="search.png" alt="step icon" style="height: 20px; margin-right: 8px; vertical-align: middle;" />
+            Run Step-by-step
+        </button>
+
+        <button id="quitStepByStepBtn" class="btn btn-primary" style="display: none;">
+            <img src="delete.png" alt="quit icon" style="height: 20px; margin-right: 8px; vertical-align: middle;" />
+            Quit Step-by-step
+        </button>
+        <button id="nextLineBtn" class="btn btn-primary" style="display: none;">
+            <img src="right-arrow.png" alt="next icon" style="height: 20px; margin-right: 8px; vertical-align: middle;" />
+            Next
+        </button>
+    </div>
+
+    <pre id="output"></pre>
+</div>
+<script>
+    let processId = null;
+    let isStepping = false;
+
+    function animateClick(btn) {
+        btn.classList.add('clicked');
+        setTimeout(() => btn.classList.remove('clicked'), 150);
+    }
+
+    // Full simulation function
+    function submitBinary() {
+        const fileInput = document.getElementById('binfile');
+        const output = document.getElementById('output');
+
+        if (!fileInput.files.length) {
+            output.textContent = "❌ Please select a .bin file first.";
+            return;
+        }
+
+        output.textContent = "⏳ Running full simulation...\n";
+
+        const formData = new FormData();
+        formData.append('binfile', fileInput.files[0]);
+        formData.append('mode', 'full');
+
+        fetch('http://localhost:5001/simulate', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => {
+                if (!res.ok) {
+                    return res.json().then(err => Promise.reject(err));
+                }
+                return res.text();
+            })
+            .then(data => {
+                output.textContent = "✅ Full simulation completed:\n\n" + data;
+            })
+            .catch(err => {
+                output.textContent = "❌ Error: " + (err.error || err.message || "Unknown error");
+            });
+    }
+
+    // Step-by-step simulation function
+    function submitBinaryStepByStep() {
+        const fileInput = document.getElementById('binfile');
+        const output = document.getElementById('output');
+
+        if (!fileInput.files.length) {
+            output.textContent = "❌ Please select a .bin file first.";
+            return;
+        }
+
+        output.textContent = "⏳ Starting step-by-step simulation...\n";
+
+        // UI: show step control buttons
+        document.getElementById('stepByStepBtn').style.display = 'none';
+        document.getElementById('quitStepByStepBtn').style.display = 'inline-flex';
+        document.getElementById('nextLineBtn').style.display = 'inline-flex';
+
+        const formData = new FormData();
+        formData.append('binfile', fileInput.files[0]);
+        formData.append('mode', 'step');
+
+        fetch('http://localhost:5001/simulate', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => {
+                if (!res.ok) {
+                    return res.json().then(err => Promise.reject(err));
+                }
+                return res.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                processId = data.process_id;
+                isStepping = true;
+                output.textContent = "✅ Step-by-step simulation started.\n\n" + data.initial_output + "\n\n✅ Ready. Click 'Next' to proceed...";
+            })
+            .catch(err => {
+                output.textContent = "❌ Error: " + (err.error || err.message || "Unknown error");
+                resetStepButtons();
+            });
+    }
+
+    // Execute next step
+    function showNextLine() {
+        if (!processId || !isStepping) return;
+
+        const output = document.getElementById('output');
+
+        fetch('http://localhost:5001/step_simulation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                process_id: processId,
+                command: '\n'
+            })
+        })
+            .then(res => {
+                if (!res.ok) {
+                    return res.json().then(err => Promise.reject(err));
+                }
+                return res.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Append new step output
+                if (data.output && data.output.trim()) {
+                    output.textContent += "\n\n--- Step " + data.step_count + " ---\n" + data.output;
+                } else {
+                    output.textContent += "\n\n--- Step " + data.step_count + " --- (No new output)";
+                }
+
+                if (data.terminated) {
+                    output.textContent += "\n\n✅ Step-by-step simulation completed after " + data.step_count + " steps.";
+                    resetStepButtons();
+                }
+            })
+            .catch(err => {
+                output.textContent += "\n\n❌ Error during step execution: " + (err.error || err.message || "Unknown error");
+                resetStepButtons();
+            });
+    }
+
+    // Quit step-by-step simulation
+    function quitStepByStep() {
+        if (!processId || !isStepping) {
+            resetStepButtons();
+            return;
+        }
+
+        fetch('http://localhost:5001/end_simulation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                process_id: processId
+            })
+        })
+            .then(res => {
+                if (!res.ok) {
+                    return res.json().then(err => Promise.reject(err));
+                }
+                return res.json();
+            })
+            .then(data => {
+                document.getElementById('output').textContent += "\n\n⛔️ Step-by-step simulation stopped.";
+                resetStepButtons();
+            })
+            .catch(err => {
+                document.getElementById('output').textContent += "\n\n❌ Error stopping simulation: " + (err.error || err.message || "Unknown error");
+                resetStepButtons();
+            });
+    }
+
+    // Reset button states
+    function resetStepButtons() {
+        document.getElementById('nextLineBtn').style.display = 'none';
+        document.getElementById('quitStepByStepBtn').style.display = 'none';
+        document.getElementById('stepByStepBtn').style.display = 'inline-flex';
+        processId = null;
+        isStepping = false;
+    }
+
+    // Button event handlers
+    document.getElementById('stepByStepBtn').addEventListener('click', function() {
+        animateClick(this);
+        submitBinaryStepByStep();
+    });
+
+    document.getElementById('nextLineBtn').addEventListener('click', function() {
+        animateClick(this);
+        showNextLine();
+    });
+
+    document.getElementById('quitStepByStepBtn').addEventListener('click', function() {
+        animateClick(this);
+        quitStepByStep();
+    });
+</script>
+
+</body>
+</html>

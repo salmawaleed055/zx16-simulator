@@ -622,11 +622,18 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
     }
 }
 
+<<<<<<< Updated upstream
 
 void printUsage(const char* progName) {
     std::cerr << "Usage: " << progName << " [-i] <machine_code_file_name.bin>" << std::endl;
     std::cerr << "  -i: Interactive mode (single-stepping)" << std::endl;
 }
+=======
+int main(int argc, char **argv) {
+    z16sim simulator; // Create an instance of your simulator
+    bool interactive_mode = false;
+    std::string machine_code_file;
+>>>>>>> Stashed changes
 
 int main(int argc, char* argv[]) {
     bool interactive = false;
@@ -645,16 +652,47 @@ int main(int argc, char* argv[]) {
             printUsage(argv[0]);
             return 1;
         }
+<<<<<<< Updated upstream
     } else {
         printUsage(argv[0]);
         return 1;
     }
 
     z16sim simulator; // Create an instance of the simulator
+=======
+    } else { // argc == 2
+        machine_code_file = argv[1];
+    }
+
+    // --- 2. Load Memory ---
+    try {
+        simulator.loadMemoryFromFile(machine_code_file.c_str());
+        // This message will be part of the initial output captured by the backend
+        std::cout << "Loaded machine code from " << machine_code_file << std::endl;
+    } catch (const std::runtime_error& e) {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+
+    // --- 3. Handle Simulation Modes ---
+    if (!interactive_mode) {
+        // --- Full Simulation Mode ---
+        // In this mode, the simulator runs until completion or halt.
+        // The `simulator.cycle()` method should print any desired output (disassembly, debug info)
+        // based on its internal flags.
+        std::cout << "Starting full simulation..." << std::endl;
+        simulator.setDebug(true); // Enable debug output for full simulation too
+
+        while(simulator.cycle()) {
+            // Loop continues as long as simulator.cycle() returns true (not halted)
+        }
+        std::cout << "Full simulation finished." << std::endl;
+>>>>>>> Stashed changes
 
     // Load the machine code binary from the specified file
     simulator.loadMemoryFromFile(filename);
 
+<<<<<<< Updated upstream
     if (interactive) {
         std::cout << "Interactive mode enabled. Press ENTER to execute next instruction, 'q' then ENTER to quit." << std::endl;
         std::cout << "Initial state:" << std::endl;
@@ -662,6 +700,10 @@ int main(int argc, char* argv[]) {
         std::cout << "PC: 0x" << std::hex << std::setw(4) << std::setfill('0')
                   << simulator.getPC() << std::endl;
         std::cout << std::endl;
+=======
+        std::cout << "Starting interactive simulation." << std::endl;
+        simulator.dumpRegisters(); // Print initial state of registers
+>>>>>>> Stashed changes
 
         // Interactive simulation
         while (true) {
@@ -676,9 +718,26 @@ int main(int argc, char* argv[]) {
                 break;
             }
 
+<<<<<<< Updated upstream
             // Execute one instruction
             if (!simulator.cycle()) {
                 std::cout << "Simulation terminated by instruction." << std::endl;
+=======
+            // Check if the backend sent a 'q' command to quit the simulation
+            if (line_input == "q" || line_input == "Q") {
+                std::cout << "Quitting interactive simulation as requested." << std::endl;
+                break;
+            }
+
+            // Execute one simulation cycle (one instruction)
+            // The simulator.cycle() method, because debug is true, should print
+            // the disassembled instruction and the updated register state.
+            if (!simulator.cycle()) {
+                // If cycle() returns false, it means the simulation has halted (e.g., reached HLT instruction).
+                std::cout << "Simulation halted." << std::endl;
+                // No need to send READY_FOR_STEP if the simulation has finished;
+                // the process will terminate, and the backend will detect it.
+>>>>>>> Stashed changes
                 break;
             }
 
@@ -693,6 +752,10 @@ int main(int argc, char* argv[]) {
         while (simulator.cycle()) {
             // Continue simulation as long as cycle() returns true
         }
+<<<<<<< Updated upstream
+=======
+        std::cout << "Interactive simulation finished." << std::endl;
+>>>>>>> Stashed changes
     }
 
     // Final register state
