@@ -633,6 +633,9 @@ void printUsage(const char* progName) {
 =======
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -696,6 +699,9 @@ int main(int argc, char* argv[]) {
         std::cout << "Full simulation finished." << std::endl;
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -708,6 +714,7 @@ int main(int argc, char* argv[]) {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     if (interactive) {
         std::cout << "Interactive mode enabled. Press ENTER to execute next instruction, 'q' then ENTER to quit." << std::endl;
         std::cout << "Initial state:" << std::endl;
@@ -716,6 +723,8 @@ int main(int argc, char* argv[]) {
                   << simulator.getPC() << std::endl;
         std::cout << std::endl;
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -768,12 +777,16 @@ int main(int argc, char* argv[]) {
         }
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     } else {
         // Normal simulation mode
         while (simulator.cycle()) {
             // Continue simulation as long as cycle() returns true
         }
 <<<<<<< Updated upstream
+=======
+        std::cout << "Interactive simulation finished." << std::endl;
+>>>>>>> Stashed changes
 =======
         std::cout << "Interactive simulation finished." << std::endl;
 >>>>>>> Stashed changes
