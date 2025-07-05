@@ -4,159 +4,7 @@
     <meta charset="UTF-8" />
     <title>Z16 Simulator Upload</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="App.css" />
-
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
-            color: #ffffff;
-            min-height: 100vh;
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
-        }
-
-        .container {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            z-index: 1;
-        }
-
-        .bg-pattern {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-image:
-                    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
-                    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.1) 0%, transparent 50%);
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        .floating-elements {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        .floating-circle {
-            position: absolute;
-            border-radius: 50%;
-            background: linear-gradient(45deg, rgba(255, 107, 107, 0.1), rgba(78, 205, 196, 0.1));
-            animation: float 6s ease-in-out infinite;
-        }
-
-        .floating-circle:nth-child(1) {
-            width: 80px;
-            height: 80px;
-            top: 20%;
-            left: 10%;
-            animation-delay: 0s;
-        }
-
-        .floating-circle:nth-child(2) {
-            width: 60px;
-            height: 60px;
-            top: 60%;
-            right: 15%;
-            animation-delay: 2s;
-        }
-
-        .floating-circle:nth-child(3) {
-            width: 100px;
-            height: 100px;
-            bottom: 20%;
-            left: 20%;
-            animation-delay: 4s;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(10deg); }
-        }
-
-        h1 {
-            font-size: 3rem;
-            margin-bottom: 2rem;
-            background: linear-gradient(45deg, #ffffff, #a0a0a0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-align: center;
-            z-index: 10;
-        }
-
-        .upload-box {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 2rem;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            max-width: 500px;
-            width: 90%;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            z-index: 10;
-        }
-
-        input[type="file"] {
-            color: white;
-            font-size: 1rem;
-        }
-
-        .btn {
-            padding: 1rem 2rem;
-            border: none;
-            border-radius: 50px;
-            font-weight: 600;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .btn-primary {
-            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-            color: white;
-            box-shadow: 0 10px 30px rgba(255, 107, 107, 0.3);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 40px rgba(255, 107, 107, 0.4);
-        }
-
-        .clicked {
-            transform: scale(0.95);
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
-        }
-
-        pre {
-            white-space: pre-wrap;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 1rem;
-            margin-top: 2rem;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 600px;
-            overflow-x: auto;
-            z-index: 10;
-        }
-    </style>
+    <link rel="stylesheet" href="Simulate.css" />
 </head>
 <body>
 <div class="bg-pattern"></div>
@@ -184,23 +32,35 @@
             Run Full Simulation
         </button>
 
-        <button class="btn btn-primary" onclick="animateClick(this); submitBinaryStepByStep()">
+        <button id="stepByStepBtn" class="btn btn-primary">
             <img src="search.png" alt="step icon" style="height: 20px; margin-right: 8px; vertical-align: middle;" />
             Run Step-by-step
         </button>
+
+        <button id="quitStepByStepBtn" class="btn btn-primary" style="display: none;">
+            <img src="delete.png" alt="quit icon" style="height: 20px; margin-right: 8px; vertical-align: middle;" />
+            Quit Step-by-step
+        </button>
+        <button id="nextLineBtn" class="btn btn-primary" style="display: none;">
+            <img src="right-arrow.png" alt="next icon" style="height: 20px; margin-right: 8px; vertical-align: middle;" />
+            Next
+        </button>
+
 
     </div>
 
     <pre id="output"></pre>
 </div>
-
 <script>
+    let stepLines = [];
+    let stepIndex = 0;
+
     function animateClick(btn) {
         btn.classList.add('clicked');
         setTimeout(() => btn.classList.remove('clicked'), 150);
     }
 
-    function submitBinary() {
+    function submitBinaryStepByStep() {
         const fileInput = document.getElementById('binfile');
         const output = document.getElementById('output');
 
@@ -209,7 +69,12 @@
             return;
         }
 
-        output.textContent = "⏳ Running simulation...";
+        output.textContent = "⏳ Preparing step-by-step output...\n";
+
+        // UI: show buttons
+        document.getElementById('stepByStepBtn').style.display = 'none';
+        document.getElementById('quitStepByStepBtn').style.display = 'inline-flex';
+        document.getElementById('nextLineBtn').style.display = 'inline-flex';
 
         const formData = new FormData();
         formData.append('binfile', fileInput.files[0]);
@@ -218,21 +83,46 @@
             method: 'POST',
             body: formData
         })
-            .then(res => {
-                if (!res.ok) return res.json().then(err => { throw err; });
-                return res.text();
-            })
+            .then(res => res.text())
             .then(data => {
-                output.textContent = data;
+                stepLines = data.split('\n');
+                stepIndex = 0;
+                output.textContent = "✅ Ready. Click 'Next' to begin...\n";
             })
             .catch(err => {
                 output.textContent = "❌ Error: " + (err.error || "Unknown error");
+                document.getElementById('stepByStepBtn').style.display = 'inline-flex';
+                document.getElementById('quitStepByStepBtn').style.display = 'none';
+                document.getElementById('nextLineBtn').style.display = 'none';
             });
     }
 
-    function submitBinaryStepByStep() {
-        alert("🚧 Step-by-step simulation is under development.");
+    function showNextLine() {
+        const output = document.getElementById('output');
+        if (stepIndex < stepLines.length) {
+            output.textContent += stepLines[stepIndex] + '\n';
+            stepIndex++;
+        } else {
+            output.textContent += "\n✅ Step-by-step simulation complete.";
+            document.getElementById('nextLineBtn').style.display = 'none';
+            document.getElementById('quitStepByStepBtn').style.display = 'none';
+            document.getElementById('stepByStepBtn').style.display = 'inline-flex';
+        }
     }
+
+    function quitStepByStep() {
+        document.getElementById('nextLineBtn').style.display = 'none';
+        document.getElementById('quitStepByStepBtn').style.display = 'none';
+        document.getElementById('stepByStepBtn').style.display = 'inline-flex';
+        document.getElementById('output').textContent += "\n⛔️ Step-by-step simulation stopped.";
+    }
+
+    // Button handlers
+    document.getElementById('stepByStepBtn').addEventListener('click', submitBinaryStepByStep);
+    document.getElementById('nextLineBtn').addEventListener('click', showNextLine);
+    document.getElementById('quitStepByStepBtn').addEventListener('click', quitStepByStep);
 </script>
+
+
 </body>
 </html>
