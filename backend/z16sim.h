@@ -1,114 +1,65 @@
-// #ifndef Z16SIM_H
-// #define Z16SIM_H
-
-// #include <cstdint>
-// #include <string>
-// #include <unordered_map>
-// #include <vector>
-
-// class z16sim {
-// private:
-//     // Constants
-//     static const int MEM_SIZE = 65536;
-//     static const int NUM_REGS = 8;
-//     static const int RA_REG = 1; // ra register index
-
-//     // Simulator state
-//     uint16_t regs[NUM_REGS];
-//     uint16_t pc;
-//     unsigned char memory[MEM_SIZE];
-//     bool debug;
-
-//     // Register name mappings
-//     static const char* regNames[NUM_REGS];
-//     std::unordered_map<std::string, int> regMap;
-
-//     // Helper methods
-//     void initializeRegisterMap();
-//     int getRegisterIndex(const std::string& regName);
-
-//     bool updatePC(uint16_t new_pc, const char* instruction_name);
-
-// public:
-//     z16sim();
-//     void dumpRegisters() const;
-//     void loadMemoryFromFile(const char* filename); // For binary files
-//     bool cycle();
-//     int executeInstruction(uint16_t inst);
-//     void reset();
-//     void disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t bufSize);
-//     uint16_t getPC() const { return pc; }
-//     void setDebug(bool d) { debug = d; }
-
-
-// };
-
-// #endif // Z16SIM_H
-
-
 #ifndef Z16SIM_H
 #define Z16SIM_H
 
-//#include <SFML/Graphics.hpp>
-#include <unordered_map>
-#include <string>
 #include <cstdint>
-#define TILE_ROWS 15
-#define TILE_COLS 20
+#include <string>
+#include <unordered_map> // Only needed if you use it for regMap
+#include <vector>        // Only needed if you use it for memory or other dynamic arrays
 
 class z16sim {
-public:
-    static const int MEM_SIZE = 65536;
-    static const int NUM_REGS = 8;
-
-    z16sim();
-    void loadMemoryFromFile(const char* filename);
-    bool cycle();
-    int executeInstruction(uint16_t inst);
-    void dumpRegisters() const;
-    void reset();
-    uint16_t getPC() const { return pc; }
-    std::pair<char, char> getTileColor(uint8_t paletteByte);
-    // Graphics methods
-    void initGraphics();
-    void updateGraphicsMemory(uint16_t addr, uint8_t value);
-    void renderScreen();
-    void renderTile(int tileIndex, int screenX, int screenY);
-    char pixelToChar(uint8_t color);
-   // sf::Color paletteToColor(uint8_t colorIndex);
-    void cleanup();
-    bool handleEvents();
-    bool needsGraphics() const { return graphicsMemoryAccessed; }
-
-
-    // Public for main loop access
-   // sf::RenderWindow window;
-   // sf::Sprite screenSprite;
-
 private:
-    unsigned char memory[MEM_SIZE];
+    // Constants
+    static const size_t MEM_SIZE = 65536;
+    static const int NUM_REGS = 8;
+    static const int RA_REG = 1; // ra register index (x1)
+
+    // Simulator state
     uint16_t regs[NUM_REGS];
     uint16_t pc;
+    unsigned char memory[MEM_SIZE];
     bool debug;
+    bool verbose; // Added for controlling messages like "Loaded X bytes"
+    int infinityCheck[4]; // Moved into class, consider its purpose for interactive vs. batch
+
+    // Register name mappings (static member, initialized in .cpp)
     static const char* regNames[NUM_REGS];
-    std::unordered_map<std::string, int> regMap;
+    void setReg(uint8_t reg_idx, uint16_t value); // Added this helper
+    // std::unordered_map<std::string, int> regMap; // If you plan to use this for ABI name lookup
 
-    // Graphics members
-    //sf::Texture screenTexture;
+    // Helper methods (commented out if not used or if you implement them)
+    // void initializeRegisterMap();
+    // int getRegisterIndex(const std::string& regName);
 
-    //sf::Uint8 frameBuffer[320 * 240 * 4]; // RGBA pixels
-    uint8_t tileMap[300];                  // 20x15 tiles
-    uint8_t tileData[16][128];             // 16 tiles, 128 bytes each
-    uint8_t colorPalette[16];              // 16 colors
-    bool screenNeedsUpdate;
-    bool graphicsInitialized;
-    bool graphicsMemoryAccessed;
+public:
+    z16sim(); // Constructor
+    void dumpRegisters() const;
+    void loadMemoryFromFile(const char* filename); // No prompts from here
+    bool cycle(); // Executes one instruction cycle, returns true to continue, false to halt
+    int executeInstruction(uint16_t inst); // Internal execution logic, returns 0 to signal halt
+    void reset();
 
-    void initializeRegisterMap();
-    int getRegisterIndex(const std::string& regName);
-    bool updatePC(uint16_t new_pc, const char* instruction_name);
-    static void disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t bufSize);
+    // Debugging and control setters/getters
+    uint16_t getPC() const { return pc; }
+    void setPC(uint16_t new_pc) { this->pc = new_pc; } // Added this line explicitly
+    void setDebug(bool d);
+    bool isDebug() const; // Optional getter
+
+    void setVerbose(bool val);
+    bool isVerbose() const; // Optional getter
+
+    // Disassembler method
+    void disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t bufSize);
+
+    // Other potentially useful getters for frontend
+    uint16_t getReg(int index) const {
+        if (index >= 0 && index < NUM_REGS) return regs[index];
+        return 0; // Or throw an error
+    }
+    unsigned char getMemByte(uint16_t addr) const {
+        if (addr < MEM_SIZE) return memory[addr];
+        return 0; // Or throw an error
+    }
 };
 
-#endif
+#endif // Z16SIM_H
 
