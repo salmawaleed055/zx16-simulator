@@ -27,17 +27,14 @@ int main() {
     // NOP instruction (ADD x0, x0) often used as filler or skipped instruction
     const uint16_t NOP = 0x0000;
 
-    std::vector<uint16_t> tc_03_and_insts = {
-        // li x1, 7 (imm=7, rd=x1(1), funct3=7, opcode=1) => (7<<9)|(1<<6)|(7<<3)|1 = 0x0E79
-        0x0E79,
-        // li x2, 2 (imm=2, rd=x2(2), funct3=7, opcode=1) => (2<<9)|(2<<6)|(7<<3)|1 = 0x04B9
-        0x04B9,
-        // and x1, x1, x2 (funct4=8, rs2=x2(2), rd_rs1=x1(1), funct3=5, opcode=0) => (8<<12)|(2<<9)|(1<<6)|(5<<3)|0 = 0x8468
-        0x8468,
-        // ecall 0x3FF
-        0xFFC7
+    std::vector<uint16_t> graphics_insts = {
+        0x006E, // LUI x1, 0x1F4
+        0x0061, // ORI x1, x1, 0
+        0xC041, // ORI x2, x0, -32 (0xE0)
+        0x1223, // SB x2, 1(x1)
+        0xFFC7  // ECALL 0x3FF
     };
-    createBinFile("tests/TC-ZX16-03_AND.bin", tc_03_and_insts);
+    createBinFile("tests_new/graphics.bin", graphics_insts);
 
     std::cout << "\nAll binary test files generated." << std::endl;
     return 0;

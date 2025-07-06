@@ -5,6 +5,7 @@
 #include <cstdio>    // For snprintf, fopen, fread, ferror, fclose
 #include <cstring>
 
+
 // Initialize static member (outside class definition)
 const char* z16sim::regNames[z16sim::NUM_REGS] = {"t0", "ra", "sp", "s0", "s1", "t1", "a0", "a1"};
 
@@ -13,14 +14,19 @@ const char* z16sim::regNames[z16sim::NUM_REGS] = {"t0", "ra", "sp", "s0", "s1", 
 z16sim::z16sim() : pc(0), debug(false) {
     memset(regs, 0, sizeof(regs));
     memset(memory, 0, sizeof(memory));
-    // Initialize infinityCheck if it's a member array
-    // If you want to use it, uncomment it and consider it's reset in reset()
-    // std::fill(std::begin(infinityCheck), std::end(infinityCheck), 0);
-    //
-    // For now, I'll comment out the interactive loop detection.
-    // If you want it, it's better handled at the calling (main) level,
-    // where it can decide if it wants to prompt the user or auto-terminate.
+
+
+    // Initialize graphics memory
+    memset(tileMap, 0, sizeof(tileMap));
+    memset(tileData, 0, sizeof(tileData));
+    memset(colorPalette, 0, sizeof(colorPalette));
+    memset(frameBuffer, 0, sizeof(frameBuffer));
+    screenNeedsUpdate = true;
+    graphicsInitialized = false;
+    graphicsMemoryAccessed = false;
+
 }
+
 
 // Resets the simulator state
 void z16sim::reset() {
@@ -377,41 +383,56 @@ int z16sim::executeInstruction(uint16_t inst) {
             }
             break;
         }
-        case 0x1: { // I-type
-            uint8_t imm7   = (inst >> 9) & 0x7F;
-            uint8_t rd_rs1 = (inst >> 6) & 0x7;
+        case 0x1: { // I-type (addi, slti, etc.)
+            int16_t imm = (inst >> 9) & 0x7F; // 7-bit immediate
+            uint8_t rs1_rd = (inst >> 6) & 0x7;
             uint8_t funct3 = (inst >> 3) & 0x7;
-            int16_t simm = (imm7 & 0x40) ? (imm7 | 0xFF80) : imm7; // Sign extend 7-bit immediate
+            
+            if (imm & 0x40) imm |= 0xFF80; // Sign-extend
 
-            if (funct3 == 0x0) // addi
-                regs[rd_rs1]+=simm;
-            else if(funct3 == 0x1) // slti (set less than immediate signed)
-                regs[rd_rs1]=((int16_t)regs[rd_rs1]<simm);
-            else if(funct3 == 0x2) // sltiu (set less than immediate unsigned)
-                regs[rd_rs1]=(regs[rd_rs1]<(uint16_t)simm); // Note: Comparison with unsigned immediate
-            else if(funct3 == 0x3) // Shift immediates
-            {
-                uint8_t shamt = imm7 & 0x7; // Shift amount (3 bits for 16-bit shift)
-                uint8_t shift_type_bits = (imm7 >> 3) & 0x3; // The two most significant bits of the immediate control shift type
-                if (shift_type_bits == 0x1) // 01b for SLLI
-                    regs[rd_rs1]= regs[rd_rs1] << shamt;
-                else if (shift_type_bits == 0x2)// 10b for SRLI
-                    regs[rd_rs1]= regs[rd_rs1] >> shamt;
-                else if (shift_type_bits == 0x3) // 11b for SRAI
-                    regs[rd_rs1]= (uint16_t)(((int16_t)regs[rd_rs1]) >> shamt);
-                else {
-                    std::cerr << "Unknown I-Type Shift instruction at PC 0x" << std::hex << pc << std::dec << "\n";
-                    return 0; // Terminate on unknown instruction
+            uint16_t val1 = this->regs[rs1_rd]; // For I-type, rs1_rd is RS1 or RD
+
+            if (funct3 == 0x0) { // addi
+                this->regs[rs1_rd] = val1 + imm;
+                this->pc += 2;
+            } else if (funct3 == 0x1) { // slti (set less than immediate signed)
+                this->regs[rs1_rd] = ((int16_t)val1 < imm) ? 1 : 0;
+                this->pc += 2;
+            } else if (funct3 == 0x2) { // sltui (set less than immediate unsigned)
+                this->regs[rs1_rd] = (val1 < (uint16_t)imm) ? 1 : 0;
+                this->pc += 2;
+            } else if (funct3 == 0x3) { // Shift immediates
+                uint8_t shift_type = (imm >> 4) & 0x7;
+                uint8_t shamt = imm & 0xF;
+                if (shift_type == 0x1) { // slli
+                    this->regs[rs1_rd] = val1 << shamt;
+                    this->pc += 2;
+                } else if (shift_type == 0x2) { // srli
+                    this->regs[rs1_rd] = val1 >> shamt;
+                    this->pc += 2;
+                } else if (shift_type == 0x4) { // srai
+                    this->regs[rs1_rd] = (int16_t)val1 >> shamt;
+                    this->pc += 2;
+                } else {
+                     std::cerr << "Unknown I-type shift instruction: 0x" << std::hex << inst << " at PC: 0x" << this->pc << std::endl;
+                     return 2;
                 }
+            } else if (funct3 == 0x4) { // ori
+                this->regs[rs1_rd] = val1 | imm;
+                this->pc += 2;
+            } else if (funct3 == 0x5) { // andi
+                this->regs[rs1_rd] = val1 & imm;
+                this->pc += 2;
+            } else if (funct3 == 0x6) { // xori
+                this->regs[rs1_rd] = val1 ^ imm;
+                this->pc += 2;
+            } else if (funct3 == 0x7) { // li (load immediate)
+                this->regs[rs1_rd] = imm;
+                this->pc += 2;
+            } else {
+                std::cerr << "Unknown I-type instruction: 0x" << std::hex << inst << " at PC: 0x" << this->pc << std::endl;
+                return 2;
             }
-            else if(funct3 == 0x4) // ori
-                regs[rd_rs1] = regs[rd_rs1] | simm;
-            else if(funct3 == 0x5) // andi
-                regs[rd_rs1] = regs[rd_rs1] & simm;
-            else if(funct3 == 0x6) // xori
-                regs[rd_rs1] = regs[rd_rs1] ^ simm;
-            else if(funct3 == 0x7) // li (load immediate)
-                regs[rd_rs1] = simm;
             break;
         }
         // Fixed B-type (Branch) instruction handling in executeInstruction
@@ -486,6 +507,10 @@ case 0x2: { // B-type (Branch)
                 return 0; // Terminate simulation
             }
 
+            if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
+                updateGraphicsMemory(effective_address, regs[rs2] & 0xFF);
+            }
+
             switch (funct3) {
                 case 0x0: // sb (store byte)
                     memory[effective_address] = (uint8_t)(regs[rs2] & 0xFF);
@@ -493,6 +518,11 @@ case 0x2: { // B-type (Branch)
                 case 0x1: // sw (store word - 16-bit)
                     memory[effective_address] = regs[rs2] & 0xFF;         // Lower byte
                     memory[effective_address + 1] = (regs[rs2] >> 8) & 0xFF; // Upper byte
+
+                    if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
+                        updateGraphicsMemory(effective_address + 1, (regs[rs2] >> 8) & 0xFF);
+                    }
+
                     break;
                 default:
                     std::cerr << "Unknown store funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
@@ -569,7 +599,7 @@ case 0x2: { // B-type (Branch)
             uint16_t I_upper = (inst >> 7) & 0xFF; // 8-bit immediate from bits [14:7]
 
             if(f==0)    // lui (load upper immediate)
-                regs[rd] = (I_upper << 7); // Load upper 8 bits, shifted by 7 to align
+                regs[rd] = (I_upper << 8); 
             else        // auipc (add upper immediate to PC)
                 regs[rd] = pc + (I_upper << 7); // Add PC-relative immediate
             break;
@@ -633,6 +663,156 @@ bool z16sim::cycle() {
     return true; // Continue to next cycle
 }
 
+void z16sim::initGraphics() {
+    std::cout << "HEREEEEE AT BEGINNING OF INITGRAPHICS" << std::endl;
+    if (graphicsInitialized) return;
+
+    // Create window
+    window.create(sf::VideoMode(640, 480), "ZX16 Simulator");
+    window.setFramerateLimit(60);
+    
+    // Create texture for screen
+    screenTexture.create(320, 240);
+    screenSprite.setTexture(screenTexture);
+    screenSprite.setScale(2.0f, 2.0f); // 2x scale for visibility
+    
+    // Initialize default palette
+    colorPalette[0] = 0x00;   // Black
+    colorPalette[1] = 0x1C;   // Red
+    colorPalette[2] = 0xE0;   // Green
+    colorPalette[3] = 0xFC;   // Yellow
+    colorPalette[4] = 0x03;   // Blue
+    colorPalette[5] = 0x1F;   // Magenta
+    colorPalette[6] = 0xE3;   // Cyan
+    colorPalette[7] = 0xFF;   // White
+    
+    graphicsInitialized = true;
+
+    std::cout << "SFML Graphics initialized: 320x240 display (scaled 2x)" << std::endl;
+}
+
+void z16sim::updateGraphicsMemory(uint16_t addr, uint8_t value) {
+    std::cout << "HEEEREE AT BEGINNING OF UPDATEGRAPHICSMEMORY" << std::endl;
+    if (!graphicsMemoryAccessed) {
+        graphicsMemoryAccessed = true;
+        std::cout << "haallloooooo" << std::endl;
+        initGraphics();
+    }
+        if (addr >= 0xF000 && addr <= 0xF12B) {
+        // Tile map update
+        tileMap[addr - 0xF000] = value;
+        screenNeedsUpdate = true;
+    }
+    else if (addr >= 0xF200 && addr <= 0xF9FF) {
+        // Tile data update
+        int tileIndex = (addr - 0xF200) / 128;
+        int byteOffset = (addr - 0xF200) % 128;
+        if (tileIndex < 16) {
+            tileData[tileIndex][byteOffset] = value;
+            screenNeedsUpdate = true;
+        }
+    }
+    else if (addr >= 0xFA00 && addr <= 0xFA0F) {
+        // Color palette update
+        colorPalette[addr - 0xFA00] = value;
+        screenNeedsUpdate = true;
+    }
+}
+
+
+sf::Color z16sim::paletteToColor(uint8_t colorIndex) {
+    if (colorIndex >= 16) colorIndex = 0;
+    
+    uint8_t colorByte = colorPalette[colorIndex];
+    uint8_t r = ((colorByte >> 5) & 0x7) * 36;  // 3 bits -> 0-255
+    uint8_t g = ((colorByte >> 2) & 0x7) * 36;  // 3 bits -> 0-255
+    uint8_t b = (colorByte & 0x3) * 85;         // 2 bits -> 0-255
+    
+    return sf::Color(r, g, b);
+}
+
+void z16sim::renderTile(int tileIndex, int screenX, int screenY) {
+    if (tileIndex >= 16) return;
+    
+    for (int y = 0; y < 16; y++) {
+        for (int x = 0; x < 16; x += 2) {
+            int byteIndex = y * 8 + x / 2;
+            uint8_t pixelPair = tileData[tileIndex][byteIndex];
+            
+            uint8_t pixel0Color = pixelPair & 0x0F;
+            uint8_t pixel1Color = (pixelPair >> 4) & 0x0F;
+            
+            sf::Color color0 = paletteToColor(pixel0Color);
+            sf::Color color1 = paletteToColor(pixel1Color);
+            
+            // Set pixels in frame buffer
+            int fbIndex0 = ((screenY + y) * 320 + (screenX + x)) * 4;
+            int fbIndex1 = ((screenY + y) * 320 + (screenX + x + 1)) * 4;
+            
+            if (fbIndex0 < 320 * 240 * 4) {
+                frameBuffer[fbIndex0] = color0.r;
+                frameBuffer[fbIndex0 + 1] = color0.g;
+                frameBuffer[fbIndex0 + 2] = color0.b;
+                frameBuffer[fbIndex0 + 3] = 255;
+            }
+            
+            if (fbIndex1 < 320 * 240 * 4) {
+                frameBuffer[fbIndex1] = color1.r;
+                frameBuffer[fbIndex1 + 1] = color1.g;
+                frameBuffer[fbIndex1 + 2] = color1.b;
+                frameBuffer[fbIndex1 + 3] = 255;
+            }
+        }
+    }
+}
+
+void z16sim::renderScreen() {
+    if (!screenNeedsUpdate) return;
+    
+    // Clear frame buffer
+    memset(frameBuffer, 0, sizeof(frameBuffer));
+    
+    // Render each tile position
+    for (int row = 0; row < 15; row++) {
+        for (int col = 0; col < 20; col++) {
+            int tileMapIndex = row * 20 + col;
+            uint8_t tileIndex = tileMap[tileMapIndex];
+            renderTile(tileIndex, col * 16, row * 16);
+        }
+    }
+    
+    // Update SFML texture
+    screenTexture.update(frameBuffer);
+    screenNeedsUpdate = false;
+}
+
+bool z16sim::handleEvents() {
+    sf::Event event;
+    while (window.pollEvent(event)) {
+        if (event.type == sf::Event::Closed) {
+            return false;
+        }
+        if (event.type == sf::Event::KeyPressed) {
+            if (event.key.code == sf::Keyboard::Escape) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void z16sim::cleanup() {
+    if (window.isOpen()) {
+        window.close();
+    }
+}
+
+bool z16sim::needsGraphics() const {
+    std::cout << "i am in needsGraphics" << std::endl;
+    std::cout << "graphicsMemoryAccessed: " << graphicsMemoryAccessed << std::endl;
+    return graphicsMemoryAccessed;
+}
+
 int main(int argc, char **argv) {
     z16sim simulator; // Create an instance of your simulator
     bool interactive_mode = false;
@@ -677,13 +857,52 @@ int main(int argc, char **argv) {
         // based on its internal flags.
         std::cout << "Starting full simulation..." << std::endl;
         simulator.setDebug(true); // Enable debug output for full simulation too
+        bool programRunning = true;
 
-        while(simulator.cycle()) {
-            // Loop continues as long as simulator.cycle() returns true (not halted)
+        while (programRunning) {
+            if (simulator.needsGraphics()){
+                std::cout << "if you see this then needsGraphics returned true" << std::endl;
+                if (!simulator.handleEvents()) break;
+                else std::cout << "if you see this then handleEvents returned true" << std::endl;
+            }
+
+            if (!simulator.cycle()) {
+                programRunning = false;
+                std::cout << "Program execution completed." << std::endl;
+
+                if (simulator.needsGraphics()) {
+                        std::cout << "Press ESC or close window to exit." << std::endl;
+
+                        while (simulator.window.isOpen()) {
+                            if (!simulator.handleEvents()) break;
+                            simulator.renderScreen();
+                            simulator.window.clear();
+                            simulator.window.draw(simulator.screenSprite);
+                            simulator.window.display();
+                            sf::sleep(sf::milliseconds(100));
+                        }
+                    }
+                break;
+    
+            }
+
+            // Update graphics
+            if (simulator.needsGraphics()) {
+                    simulator.renderScreen();
+                    simulator.window.clear();
+                    simulator.window.draw(simulator.screenSprite);
+                    simulator.window.display();
+                    sf::sleep(sf::milliseconds(16)); // ~60 FPS
+                }
         }
-        std::cout << "Full simulation finished." << std::endl;
 
-    } else {
+            // while(simulator.cycle()) {
+            //     // Loop continues as long as simulator.cycle() returns true (not halted)
+            // }
+            // std::cout << "Full simulation finished." << std::endl;
+
+        } 
+    else {
         // --- Interactive/Step-by-Step Mode ---
         // In this mode, the simulator executes one instruction per input from the backend.
         // `setDebug(true)` is crucial here to ensure `cycle()` prints register/memory state.
@@ -711,6 +930,9 @@ int main(int argc, char **argv) {
                 break;
             }
 
+
+            if (simulator.needsGraphics() && !simulator.handleEvents()) break;
+
             // Execute one simulation cycle (one instruction)
             // The simulator.cycle() method, because debug is true, should print
             // the disassembled instruction and the updated register state.
@@ -722,6 +944,14 @@ int main(int argc, char **argv) {
                 break;
             }
 
+            // update graphics
+            if (simulator.needsGraphics()) {
+                simulator.renderScreen();
+                simulator.window.clear();
+                simulator.window.draw(simulator.screenSprite);
+                simulator.window.display();
+            }
+
             // If the simulation is still running, signal readiness for the next step
             std::cout << "READY_FOR_STEP" << std::endl;
             std::cout.flush(); // Ensure this is sent immediately
@@ -729,5 +959,6 @@ int main(int argc, char **argv) {
         std::cout << "Interactive simulation finished." << std::endl;
     }
 
+    simulator.cleanup();
     return 0;
 }
