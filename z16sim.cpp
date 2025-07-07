@@ -43,23 +43,9 @@ void z16sim::setDebug(bool d) {
     debug = d;
 }
 
-// Set verbose mode (for messages like "Loaded X bytes")
-void z16sim::setVerbose(bool val) {
-    // Assuming you add a 'verbose' member to your class, e.g., bool verbose;
-    // this->verbose = val;
-    // If you don't have it, just remove this function or add the member.
-    // For this example, I will assume `verbose` member exists.
-}
 
-// Optional getter for debug status
 bool z16sim::isDebug() const {
     return debug;
-}
-
-// Optional getter for verbose status (assuming it exists)
-bool z16sim::isVerbose() const {
-    // return verbose;
-    return false; // Placeholder if you haven't added 'verbose' member
 }
 
 
@@ -88,10 +74,6 @@ void z16sim::loadMemoryFromFile(const char* filename) {
     }
     std::fclose(file);
 
-    // If verbose mode is implemented and enabled, then print:
-    // if (verbose) { // Assuming 'verbose' is a member variable
-    //     std::cout << "Loaded " << bytesRead << " bytes into memory\n";
-    // }
 }
 
 // Disassembly function (moved into class, signature matches header)
@@ -383,60 +365,154 @@ int z16sim::executeInstruction(uint16_t inst) {
             }
             break;
         }
-        case 0x1: { // I-type (addi, slti, etc.)
-            int16_t imm = (inst >> 9) & 0x7F; // 7-bit immediate
-            uint8_t rs1_rd = (inst >> 6) & 0x7;
-            uint8_t funct3 = (inst >> 3) & 0x7;
+        // case 0x1: { // I-type (addi, slti, etc.)
+        //     int16_t imm = (inst >> 9) & 0x7F; // 7-bit immediate
+        //     uint8_t rs1_rd = (inst >> 6) & 0x7;
+        //     uint8_t funct3 = (inst >> 3) & 0x7;
             
-            if (imm & 0x40) imm |= 0xFF80; // Sign-extend
+        //     if (imm & 0x40) imm |= 0xFF80; // Sign-extend
 
-            uint16_t val1 = this->regs[rs1_rd]; // For I-type, rs1_rd is RS1 or RD
+        //     uint16_t val1 = this->regs[rs1_rd]; // For I-type, rs1_rd is RS1 or RD
 
-            if (funct3 == 0x0) { // addi
-                this->regs[rs1_rd] = val1 + imm;
-                this->pc += 2;
-            } else if (funct3 == 0x1) { // slti (set less than immediate signed)
-                this->regs[rs1_rd] = ((int16_t)val1 < imm) ? 1 : 0;
-                this->pc += 2;
-            } else if (funct3 == 0x2) { // sltui (set less than immediate unsigned)
-                this->regs[rs1_rd] = (val1 < (uint16_t)imm) ? 1 : 0;
-                this->pc += 2;
-            } else if (funct3 == 0x3) { // Shift immediates
-                uint8_t shift_type = (imm >> 4) & 0x7;
-                uint8_t shamt = imm & 0xF;
-                if (shift_type == 0x1) { // slli
-                    this->regs[rs1_rd] = val1 << shamt;
-                    this->pc += 2;
-                } else if (shift_type == 0x2) { // srli
-                    this->regs[rs1_rd] = val1 >> shamt;
-                    this->pc += 2;
-                } else if (shift_type == 0x4) { // srai
-                    this->regs[rs1_rd] = (int16_t)val1 >> shamt;
-                    this->pc += 2;
-                } else {
-                     std::cerr << "Unknown I-type shift instruction: 0x" << std::hex << inst << " at PC: 0x" << this->pc << std::endl;
-                     return 2;
+        //     if (funct3 == 0x0) { // addi
+        //         this->regs[rs1_rd] = val1 + imm;
+        //         this->pc += 2;
+        //     } else if (funct3 == 0x1) { // slti (set less than immediate signed)
+        //         this->regs[rs1_rd] = ((int16_t)val1 < imm) ? 1 : 0;
+        //         this->pc += 2;
+        //     } else if (funct3 == 0x2) { // sltui (set less than immediate unsigned)
+        //         this->regs[rs1_rd] = (val1 < (uint16_t)imm) ? 1 : 0;
+        //         this->pc += 2;
+        //     } else if (funct3 == 0x3) { // Shift immediates
+        //         uint8_t shift_type = (imm >> 4) & 0x7;
+        //         uint8_t shamt = imm & 0xF;
+        //         if (shift_type == 0x1) { // slli
+        //             this->regs[rs1_rd] = val1 << shamt;
+        //             this->pc += 2;
+        //         } else if (shift_type == 0x2) { // srli
+        //             this->regs[rs1_rd] = val1 >> shamt;
+        //             this->pc += 2;
+        //         } else if (shift_type == 0x4) { // srai
+        //             this->regs[rs1_rd] = (int16_t)val1 >> shamt;
+        //             this->pc += 2;
+        //         } else {
+        //              std::cerr << "Unknown I-type shift instruction: 0x" << std::hex << inst << " at PC: 0x" << this->pc << std::endl;
+        //              return 2;
+        //         }
+        //     } else if (funct3 == 0x4) { // ori
+        //         this->regs[rs1_rd] = val1 | imm;
+        //         // this->pc += 2;
+        //     } else if (funct3 == 0x5) { // andi
+        //         this->regs[rs1_rd] = val1 & imm;
+        //         // this->pc += 2;
+        //     } else if (funct3 == 0x6) { // xori
+        //         this->regs[rs1_rd] = val1 ^ imm;
+        //         // this->pc += 2;
+        //     } else if (funct3 == 0x7) { // li (load immediate)
+        //         this->regs[rs1_rd] = imm;
+        //         // this->pc += 2;
+        //     } else {
+        //         std::cout << "Unknown I-type instruction: 0x" << std::hex << inst << " at PC: 0x" << this->pc << std::endl;
+        //         return 2;
+        //     }
+        //     break;
+        // }
+        case 0x1: { // I-type
+            uint8_t imm7   = (inst >> 9) & 0x7F;
+            uint8_t rd_rs1 = (inst >> 6) & 0x7;
+            uint8_t funct3 = (inst >> 3) & 0x7;
+            int16_t simm = (imm7 & 0x40) ? (imm7 | 0xFF80) : imm7; // Sign extend 7-bit immediate
+
+            if (funct3 == 0x0) // addi
+                regs[rd_rs1]+=simm;
+            else if(funct3 == 0x1) // slti (set less than immediate signed)
+                regs[rd_rs1]=((int16_t)regs[rd_rs1]<simm);
+            else if(funct3 == 0x2) // sltiu (set less than immediate unsigned)
+                regs[rd_rs1]=(regs[rd_rs1]<(uint16_t)simm); // Note: Comparison with unsigned immediate
+            else if(funct3 == 0x3) // Shift immediates
+            {
+                uint8_t shamt = imm7 & 0x7; // Shift amount (3 bits for 16-bit shift)
+                uint8_t shift_type_bits = (imm7 >> 3) & 0x3; // The two most significant bits of the immediate control shift type
+                if (shift_type_bits == 0x1) // 01b for SLLI
+                    regs[rd_rs1]= regs[rd_rs1] << shamt;
+                else if (shift_type_bits == 0x2)// 10b for SRLI
+                    regs[rd_rs1]= regs[rd_rs1] >> shamt;
+                else if (shift_type_bits == 0x3) // 11b for SRAI
+                    regs[rd_rs1]= (uint16_t)(((int16_t)regs[rd_rs1]) >> shamt);
+                else {
+                    std::cerr << "Unknown I-Type Shift instruction at PC 0x" << std::hex << pc << std::dec << "\n";
+                    return 0; // Terminate on unknown instruction
                 }
-            } else if (funct3 == 0x4) { // ori
-                this->regs[rs1_rd] = val1 | imm;
-                this->pc += 2;
-            } else if (funct3 == 0x5) { // andi
-                this->regs[rs1_rd] = val1 & imm;
-                this->pc += 2;
-            } else if (funct3 == 0x6) { // xori
-                this->regs[rs1_rd] = val1 ^ imm;
-                this->pc += 2;
-            } else if (funct3 == 0x7) { // li (load immediate)
-                this->regs[rs1_rd] = imm;
-                this->pc += 2;
-            } else {
-                std::cerr << "Unknown I-type instruction: 0x" << std::hex << inst << " at PC: 0x" << this->pc << std::endl;
-                return 2;
             }
+            else if(funct3 == 0x4) // ori
+                regs[rd_rs1] = regs[rd_rs1] | simm;
+            else if(funct3 == 0x5) // andi
+                regs[rd_rs1] = regs[rd_rs1] & simm;
+            else if(funct3 == 0x6) // xori
+                regs[rd_rs1] = regs[rd_rs1] ^ simm;
+            else if(funct3 == 0x7) // li (load immediate)
+                regs[rd_rs1] = simm;
+
+            std::cout << "PC: " << pc << std::endl;
             break;
         }
         // Fixed B-type (Branch) instruction handling in executeInstruction
-case 0x2: { // B-type (Branch)
+    // case 0x2: { // B-type (Branch)
+    //     uint8_t offset_val = (inst >> 12) & 0xF; // 4-bit offset
+    //     uint8_t rs1 = (inst >> 6) & 0x7;
+    //     uint8_t rs2 = (inst >> 9) & 0x7;
+    //     uint8_t funct3 = (inst >> 3) & 0x7;
+
+    //     // Sign extend the 4-bit offset
+    //     int16_t simm_offset = (offset_val & 0x8) ? (offset_val | 0xFFF0) : offset_val;
+    //     simm_offset <<= 1; // Scale offset by 2 for 16-bit instruction alignment
+
+    //     bool branch_taken = false;
+    //     switch (funct3) {
+    //         case 0x0: // BEQ
+    //             if (regs[rs1] == regs[rs2]) branch_taken = true;
+    //             break;
+    //         case 0x1: // BNE
+    //             if (regs[rs1] != regs[rs2]) branch_taken = true;
+    //             break;
+    //         case 0x2: // BZ
+    //             if (regs[rs1] == 0) branch_taken = true;
+    //             break;
+    //         case 0x3: // BNZ
+    //             if (regs[rs1] != 0) branch_taken = true;
+    //             break;
+    //         case 0x4: // BLT (signed)
+    //             if ((int16_t)regs[rs1] < (int16_t)regs[rs2]) branch_taken = true;
+    //             break;
+    //         case 0x5: // BGE (signed)
+    //             if ((int16_t)regs[rs1] >= (int16_t)regs[rs2]) branch_taken = true;
+    //             break;
+    //         case 0x6: // BLTU (unsigned)
+    //             if (regs[rs1] < regs[rs2]) branch_taken = true;
+    //             break;
+    //         case 0x7: // BGEU (unsigned)
+    //             if (regs[rs1] >= regs[rs2]) branch_taken = true;
+    //             break;
+    //         default:
+    //             std::cerr << "Unknown branch funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
+    //             return 0; // Terminate
+    //     }
+
+    //     if (branch_taken) {
+    //         // Branch offset is relative to current instruction address
+    //         // pc currently points to the instruction being executed
+    //         uint16_t target_addr = pc + simm_offset;
+    //         pc = target_addr;
+    //         pcUpdated = true;
+
+    //         // Debug output to verify branch behavior
+    //         if (debug) {
+    //             std::cout << "Branch taken from 0x" << std::hex << (pc - simm_offset)
+    //                     << " to 0x" << pc << std::dec << " (offset: " << simm_offset << ")\n";
+    //         }
+    //     }
+    //     break;
+    case 0x2: { // B-type (Branch)
     uint8_t offset_val = (inst >> 12) & 0xF; // 4-bit offset
     uint8_t rs1 = (inst >> 6) & 0x7;
     uint8_t rs2 = (inst >> 9) & 0x7;
@@ -480,7 +556,7 @@ case 0x2: { // B-type (Branch)
     if (branch_taken) {
         // Branch offset is relative to current instruction address
         // pc currently points to the instruction being executed
-        uint16_t target_addr = pc + simm_offset;
+        uint16_t target_addr = pc + 2*simm_offset;
         pc = target_addr;
         pcUpdated = true;
 
@@ -520,7 +596,7 @@ case 0x2: { // B-type (Branch)
                     memory[effective_address + 1] = (regs[rs2] >> 8) & 0xFF; // Upper byte
 
                     if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
-                        updateGraphicsMemory(effective_address + 1, (regs[rs2] >> 8) & 0xFF);
+                    updateGraphicsMemory(effective_address + 1, (regs[rs2] >> 8) & 0xFF);
                     }
 
                     break;
@@ -596,12 +672,16 @@ case 0x2: { // B-type (Branch)
         case 0x6: { // U-type (Upper immediate)
             uint8_t f = (inst >> 15) & 0x1;
             uint8_t rd  = (inst >> 6) & 0x7;
-            uint16_t I_upper = (inst >> 7) & 0xFF; // 8-bit immediate from bits [14:7]
+            uint16_t I_upper = (inst >> 9) & 0x3F; // 6-bit immediate from bits [14:9]
+            uint16_t I_lower = (inst >> 3) & 0x7; // 3 bit immediate
+            uint16_t imm_15_7 = (I_upper << 3) | I_lower;
+            uint16_t imm = imm_15_7 << 7;
 
-            if(f==0)    // lui (load upper immediate)
-                regs[rd] = (I_upper << 8); 
+
+            if (f == 0)    // lui (load upper immediate)
+                regs[rd] = imm; 
             else        // auipc (add upper immediate to PC)
-                regs[rd] = pc + (I_upper << 7); // Add PC-relative immediate
+                regs[rd] = pc + imm; // Add PC-relative immediate
             break;
         }
         case 0x7: { // System instruction (ecall)
@@ -700,11 +780,14 @@ void z16sim::updateGraphicsMemory(uint16_t addr, uint8_t value) {
     }
         if (addr >= 0xF000 && addr <= 0xF12B) {
         // Tile map update
-        tileMap[addr - 0xF000] = value;
+        // tileMap[addr - 0xF000] = value;
+        std::cout << "tile map updateee" << std::endl;
+        tileMap[addr] = value;
         screenNeedsUpdate = true;
     }
     else if (addr >= 0xF200 && addr <= 0xF9FF) {
         // Tile data update
+        std::cout << "tile data updateee" << std::endl;
         int tileIndex = (addr - 0xF200) / 128;
         int byteOffset = (addr - 0xF200) % 128;
         if (tileIndex < 16) {
@@ -714,6 +797,7 @@ void z16sim::updateGraphicsMemory(uint16_t addr, uint8_t value) {
     }
     else if (addr >= 0xFA00 && addr <= 0xFA0F) {
         // Color palette update
+        std::cout << "color palette updateee" << std::endl;
         colorPalette[addr - 0xFA00] = value;
         screenNeedsUpdate = true;
     }
