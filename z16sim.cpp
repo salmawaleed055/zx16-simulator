@@ -512,62 +512,119 @@ int z16sim::executeInstruction(uint16_t inst) {
     //         }
     //     }
     //     break;
+//     case 0x2: { // B-type (Branch)
+//     uint8_t offset_val = (inst >> 12) & 0xF; // 4-bit offset
+//     uint8_t rs1 = (inst >> 6) & 0x7;
+//     uint8_t rs2 = (inst >> 9) & 0x7;
+//     uint8_t funct3 = (inst >> 3) & 0x7;
+
+//     // Sign extend the 4-bit offset
+//     int16_t simm_offset = (offset_val & 0x8) ? (offset_val | 0xFFF0) : offset_val;
+//     simm_offset <<= 1; // Scale offset by 2 for 16-bit instruction alignment
+
+//     bool branch_taken = false;
+//     switch (funct3) {
+//         case 0x0: // BEQ
+//             if (regs[rs1] == regs[rs2]) branch_taken = true;
+//             break;
+//         case 0x1: // BNE
+//             if (regs[rs1] != regs[rs2]) branch_taken = true;
+//             break;
+//         case 0x2: // BZ
+//             if (regs[rs1] == 0) branch_taken = true;
+//             break;
+//         case 0x3: // BNZ
+//             if (regs[rs1] != 0) branch_taken = true;
+//             break;
+//         case 0x4: // BLT (signed)
+//             if ((int16_t)regs[rs1] < (int16_t)regs[rs2]) branch_taken = true;
+//             break;
+//         case 0x5: // BGE (signed)
+//             if ((int16_t)regs[rs1] >= (int16_t)regs[rs2]) branch_taken = true;
+//             break;
+//         case 0x6: // BLTU (unsigned)
+//             if (regs[rs1] < regs[rs2]) branch_taken = true;
+//             break;
+//         case 0x7: // BGEU (unsigned)
+//             if (regs[rs1] >= regs[rs2]) branch_taken = true;
+//             break;
+//         default:
+//             std::cerr << "Unknown branch funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
+//             return 0; // Terminate
+//     }
+
+//     if (branch_taken) {
+//         // Branch offset is relative to current instruction address
+//         // pc currently points to the instruction being executed
+//         uint16_t target_addr = pc + 2*simm_offset;
+//         pc = target_addr;
+//         pcUpdated = true;
+
+//         // Debug output to verify branch behavior
+//         if (debug) {
+//             std::cout << "Branch taken from 0x" << std::hex << (pc - simm_offset)
+//                       << " to 0x" << pc << std::dec << " (offset: " << simm_offset << ")\n";
+//         }
+//     }
+//     break;
+// }
+
     case 0x2: { // B-type (Branch)
-    uint8_t offset_val = (inst >> 12) & 0xF; // 4-bit offset
-    uint8_t rs1 = (inst >> 6) & 0x7;
-    uint8_t rs2 = (inst >> 9) & 0x7;
-    uint8_t funct3 = (inst >> 3) & 0x7;
+        uint8_t offset_val = (inst >> 12) & 0xF; // imm[4:1] (4-bit signed offset high bits)
+        uint8_t rs1 = (inst >> 6) & 0x7;
+        uint8_t rs2 = (inst >> 9) & 0x7;
+        uint8_t funct3 = (inst >> 3) & 0x7;
 
-    // Sign extend the 4-bit offset
-    int16_t simm_offset = (offset_val & 0x8) ? (offset_val | 0xFFF0) : offset_val;
-    simm_offset <<= 1; // Scale offset by 2 for 16-bit instruction alignment
+        // Sign extend the 4-bit offset
+        int16_t simm_offset = (offset_val & 0x8) ? (offset_val | 0xFFF0) : offset_val;
 
-    bool branch_taken = false;
-    switch (funct3) {
-        case 0x0: // BEQ
-            if (regs[rs1] == regs[rs2]) branch_taken = true;
-            break;
-        case 0x1: // BNE
-            if (regs[rs1] != regs[rs2]) branch_taken = true;
-            break;
-        case 0x2: // BZ
-            if (regs[rs1] == 0) branch_taken = true;
-            break;
-        case 0x3: // BNZ
-            if (regs[rs1] != 0) branch_taken = true;
-            break;
-        case 0x4: // BLT (signed)
-            if ((int16_t)regs[rs1] < (int16_t)regs[rs2]) branch_taken = true;
-            break;
-        case 0x5: // BGE (signed)
-            if ((int16_t)regs[rs1] >= (int16_t)regs[rs2]) branch_taken = true;
-            break;
-        case 0x6: // BLTU (unsigned)
-            if (regs[rs1] < regs[rs2]) branch_taken = true;
-            break;
-        case 0x7: // BGEU (unsigned)
-            if (regs[rs1] >= regs[rs2]) branch_taken = true;
-            break;
-        default:
-            std::cerr << "Unknown branch funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
-            return 0; // Terminate
-    }
+        simm_offset <<= 1; // Shift left 1 to scale by 2 bytes (instruction size)
 
-    if (branch_taken) {
-        // Branch offset is relative to current instruction address
-        // pc currently points to the instruction being executed
-        uint16_t target_addr = pc + 2*simm_offset;
-        pc = target_addr;
-        pcUpdated = true;
-
-        // Debug output to verify branch behavior
-        if (debug) {
-            std::cout << "Branch taken from 0x" << std::hex << (pc - simm_offset)
-                      << " to 0x" << pc << std::dec << " (offset: " << simm_offset << ")\n";
+        bool branch_taken = false;
+        switch (funct3) {
+            case 0x0: // BEQ
+                if (regs[rs1] == regs[rs2]) branch_taken = true;
+                break;
+            case 0x1: // BNE
+                if (regs[rs1] != regs[rs2]) branch_taken = true;
+                break;
+            case 0x2: // BZ
+                if (regs[rs1] == 0) branch_taken = true;
+                break;
+            case 0x3: // BNZ
+                if (regs[rs1] != 0) branch_taken = true;
+                break;
+            case 0x4: // BLT (signed)
+                if ((int16_t)regs[rs1] < (int16_t)regs[rs2]) branch_taken = true;
+                break;
+            case 0x5: // BGE (signed)
+                if ((int16_t)regs[rs1] >= (int16_t)regs[rs2]) branch_taken = true;
+                break;
+            case 0x6: // BLTU (unsigned)
+                if (regs[rs1] < regs[rs2]) branch_taken = true;
+                break;
+            case 0x7: // BGEU (unsigned)
+                if (regs[rs1] >= regs[rs2]) branch_taken = true;
+                break;
+            default:
+                std::cerr << "Unknown branch funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
+                return 0; // Terminate or handle error
         }
+
+        if (branch_taken) {
+            uint16_t old_pc = pc;
+            pc = pc + 2 + simm_offset; // Add 2 to move past current instruction, then add signed offset
+            pcUpdated = true;
+
+            if (debug) {
+                std::cout << "Branch taken from 0x" << std::hex << old_pc
+                        << " to 0x" << pc << std::dec
+                        << " (offset: " << simm_offset << ")\n";
+            }
+        }
+        break;
     }
-    break;
-}
+
         case 0x3: { // S-type (Store)
             uint8_t offset_val = (inst >> 12) & 0xF;
             uint8_t rs1 = (inst >> 6) & 0x7; // Base register
@@ -649,44 +706,78 @@ int z16sim::executeInstruction(uint16_t inst) {
             }
             break;
         }
+        // case 0x5: { // J-type (Jump)
+        //     uint8_t f = (inst >> 15) & 0x1;
+        //     uint8_t imm9_4 = (inst >> 9) & 0x3F;
+        //     uint8_t rd = (inst >> 6) & 0x7;
+        //     uint8_t imm3_1 = (inst >> 3) & 0x7;
+
+        //     // Reconstruct the 10-bit immediate *value* from the instruction bits.
+        //     // This 'imm_val' is the 'offset' as described in the README's J-type format.
+        //     int16_t imm_val = (imm9_4 << 3) | imm3_1; // 9 bits for actual value, bit 0 is always 0 as instruction is 2-byte aligned
+        //     int16_t jump_offset = (imm9_4 << 4) | (imm3_1 << 1); // This is the value '4' for 'j 4'
+
+        //     // Sign-extend the jump_offset (which is supposed to be 10 bits if you look at the shifts)
+        //     if (jump_offset & 0x200) // If 10th bit is set for signed
+        //         jump_offset |= 0xFC00; // Sign extend to 16 bits
+
+        //     if (f == 0) { // j (unconditional jump)
+        //         pc += (jump_offset * 2); // Apply the offset * 2
+        //     }
+        //     else { // jal (jump and link)
+        //         regs[rd] = pc + 2; // Store return address
+        //         pc += (jump_offset * 2);   // Apply the offset * 2
+        //     }
+        //     pcUpdated = true;
+        //     break;
+        // }
         case 0x5: { // J-type (Jump)
             uint8_t f = (inst >> 15) & 0x1;
             uint8_t imm9_4 = (inst >> 9) & 0x3F;
             uint8_t rd = (inst >> 6) & 0x7;
             uint8_t imm3_1 = (inst >> 3) & 0x7;
 
-            int16_t simm_jump = (imm9_4 << 4) | (imm3_1 << 1); // Construct 10-bit immediate, scaled
+            // Assemble the 10-bit immediate (remember LSB is always 0 due to alignment)
+            uint16_t imm = (imm9_4 << 4) | (imm3_1 << 1);  // 10-bit unsigned
 
-            // Sign-extend the 10-bit immediate
-            if (simm_jump & 0x200) // If 10th bit (0x200) is set
-                simm_jump |= 0xFC00; // Sign extend to 16 bits
+            // Sign-extend the 10-bit immediate to 16 bits
+            int16_t jump_offset = (int16_t)((imm ^ 0x200) - 0x200);  // sign-extension
 
-            if (f == 0) { // j (unconditional jump)
-                // Infinity check commented out
-                pc += simm_jump;
+            if (f == 0) { // j (unconditional)
+                pc += jump_offset;
+            } else { // jal
+                regs[rd] = pc + 2;
+                pc += jump_offset;
             }
-            else { // jal (jump and link)
-                // Infinity check commented out
-                regs[rd] = pc + 2; // Store return address
-                pc += simm_jump;   // Jump to target
-            }
+
             pcUpdated = true;
             break;
         }
 
+        // case 0x6: { // U-type (Upper immediate)
+        //     uint8_t f = (inst >> 15) & 0x1;
+        //     uint8_t rd  = (inst >> 6) & 0x7;
+        //     uint16_t I_upper = (inst >> 9) & 0x3F; // 6-bit immediate from bits [14:9]
+        //     uint16_t I_lower = (inst >> 3) & 0x7; // 3 bit immediate
+        //     uint16_t imm_15_7 = (I_upper << 3) | I_lower;
+        //     uint16_t imm = imm_15_7 << 7;
+
+
+        //     if (f == 0)    // lui (load upper immediate)
+        //         regs[rd] = imm; 
+        //     else        // auipc (add upper immediate to PC)
+        //         regs[rd] = pc + imm; // Add PC-relative immediate
+        //     break;
+        // }
         case 0x6: { // U-type (Upper immediate)
             uint8_t f = (inst >> 15) & 0x1;
             uint8_t rd  = (inst >> 6) & 0x7;
-            uint16_t I_upper = (inst >> 9) & 0x3F; // 6-bit immediate from bits [14:9]
-            uint16_t I_lower = (inst >> 3) & 0x7; // 3 bit immediate
-            uint16_t imm_15_7 = (I_upper << 3) | I_lower;
-            uint16_t imm = imm_15_7 << 7;
+            uint16_t I_upper = (inst >> 7) & 0xFF; // 8-bit immediate from bits [14:7]
 
-
-            if (f == 0)    // lui (load upper immediate)
-                regs[rd] = imm; 
+            if(f==0)    // lui (load upper immediate)
+                regs[rd] = (I_upper << 7); // Load upper 8 bits, shifted by 7 to align
             else        // auipc (add upper immediate to PC)
-                regs[rd] = pc + imm; // Add PC-relative immediate
+                regs[rd] = pc + (I_upper << 7); // Add PC-relative immediate
             break;
         }
         case 0x7: { // System instruction (ecall)

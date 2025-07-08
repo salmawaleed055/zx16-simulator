@@ -70,6 +70,9 @@ void Graphics::updateGraphicsMemory(uint16_t addr, uint8_t value) {
         colorPalette[addr - 0x092C] = value;
         screenNeedsUpdate = true;
     }
+
+    std::cout << "Writing value " << std::hex << (int)value
+          << " to graphics address 0x" << addr << std::dec << std::endl;
 }
 
 
