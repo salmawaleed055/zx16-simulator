@@ -4,7 +4,7 @@
 main:
     # li s0, 0x092C # load palette base address
     lui s0, 18
-    ori s0, 0x2C
+    ori s0, 0x30
 
     li s1, 0x03 # load blue into s1
     sb s1, 0(s0) # store blue in palette

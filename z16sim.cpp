@@ -1,9 +1,9 @@
 #include "z16sim.h" 
 #include "graphics.h"
-#include <iostream>  // For std::cout, std::cerr
-#include <iomanip>   // For std::hex, std::setw, std::setfill
-#include <stdexcept> // For std::runtime_error
-#include <cstdio>    // For snprintf, fopen, fread, ferror, fclose
+#include <iostream> 
+#include <iomanip>   
+#include <stdexcept> 
+#include <cstdio>    
 #include <cstring>
 
 // Initialize static member (outside class definition)
@@ -33,9 +33,8 @@ void z16sim::reset() {
     memset(regs, 0, sizeof(regs));
     memset(memory, 0, sizeof(memory));
     pc = 0;
-    debug = false; // Reset debug status too
-    // Reset infinityCheck counts
-    //std::fill(std::begin(infinityCheck), std::end(infinityCheck), 0);
+    debug = false;
+    
 }
 
 // Set debug mode
@@ -60,6 +59,7 @@ void z16sim::dumpRegisters() const {
     std::cout << "-----------------\n";
 }
 
+
 // Loads machine code from a .bin file into memory. No user prompts.
 void z16sim::loadMemoryFromFile(const char* filename) {
     FILE *file = fopen(filename, "rb");
@@ -76,8 +76,6 @@ void z16sim::loadMemoryFromFile(const char* filename) {
 
 }
 
-// Disassembly function (moved into class, signature matches header)
-// Fixed pseudo-instruction implementations for z16sim disassemble function
 
 void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t bufSize) {
     uint8_t opcode = inst & 0x7;
@@ -353,70 +351,16 @@ int z16sim::executeInstruction(uint16_t inst) {
             else if (funct3 == 0x7)    // mv (move, alias for add x_dest, x_src, x0)
                 regs[rd_rs1] = regs[rs2];
             else if (funct3 == 0x0 && funct4 == 0x4) {    // jr (jump register)
-                // Infinity check commented out, frontend can implement
                 pc = regs[rd_rs1];
                 pcUpdated = true;
             }
             else if (funct3 == 0x0 && funct4 == 0x8) { // jalr (jump and link register)
-                // Infinity check commented out, frontend can implement
                 regs[rd_rs1] = pc + 2; // Store return address
                 pc = regs[rs2];       // Jump to target address in rs2
                 pcUpdated = true;
             }
             break;
         }
-        // case 0x1: { // I-type (addi, slti, etc.)
-        //     int16_t imm = (inst >> 9) & 0x7F; // 7-bit immediate
-        //     uint8_t rs1_rd = (inst >> 6) & 0x7;
-        //     uint8_t funct3 = (inst >> 3) & 0x7;
-            
-        //     if (imm & 0x40) imm |= 0xFF80; // Sign-extend
-
-        //     uint16_t val1 = this->regs[rs1_rd]; // For I-type, rs1_rd is RS1 or RD
-
-        //     if (funct3 == 0x0) { // addi
-        //         this->regs[rs1_rd] = val1 + imm;
-        //         this->pc += 2;
-        //     } else if (funct3 == 0x1) { // slti (set less than immediate signed)
-        //         this->regs[rs1_rd] = ((int16_t)val1 < imm) ? 1 : 0;
-        //         this->pc += 2;
-        //     } else if (funct3 == 0x2) { // sltui (set less than immediate unsigned)
-        //         this->regs[rs1_rd] = (val1 < (uint16_t)imm) ? 1 : 0;
-        //         this->pc += 2;
-        //     } else if (funct3 == 0x3) { // Shift immediates
-        //         uint8_t shift_type = (imm >> 4) & 0x7;
-        //         uint8_t shamt = imm & 0xF;
-        //         if (shift_type == 0x1) { // slli
-        //             this->regs[rs1_rd] = val1 << shamt;
-        //             this->pc += 2;
-        //         } else if (shift_type == 0x2) { // srli
-        //             this->regs[rs1_rd] = val1 >> shamt;
-        //             this->pc += 2;
-        //         } else if (shift_type == 0x4) { // srai
-        //             this->regs[rs1_rd] = (int16_t)val1 >> shamt;
-        //             this->pc += 2;
-        //         } else {
-        //              std::cerr << "Unknown I-type shift instruction: 0x" << std::hex << inst << " at PC: 0x" << this->pc << std::endl;
-        //              return 2;
-        //         }
-        //     } else if (funct3 == 0x4) { // ori
-        //         this->regs[rs1_rd] = val1 | imm;
-        //         // this->pc += 2;
-        //     } else if (funct3 == 0x5) { // andi
-        //         this->regs[rs1_rd] = val1 & imm;
-        //         // this->pc += 2;
-        //     } else if (funct3 == 0x6) { // xori
-        //         this->regs[rs1_rd] = val1 ^ imm;
-        //         // this->pc += 2;
-        //     } else if (funct3 == 0x7) { // li (load immediate)
-        //         this->regs[rs1_rd] = imm;
-        //         // this->pc += 2;
-        //     } else {
-        //         std::cout << "Unknown I-type instruction: 0x" << std::hex << inst << " at PC: 0x" << this->pc << std::endl;
-        //         return 2;
-        //     }
-        //     break;
-        // }
         case 0x1: { // I-type
             uint8_t imm7   = (inst >> 9) & 0x7F;
             uint8_t rd_rs1 = (inst >> 6) & 0x7;
@@ -428,7 +372,7 @@ int z16sim::executeInstruction(uint16_t inst) {
             else if(funct3 == 0x1) // slti (set less than immediate signed)
                 regs[rd_rs1]=((int16_t)regs[rd_rs1]<simm);
             else if(funct3 == 0x2) // sltiu (set less than immediate unsigned)
-                regs[rd_rs1]=(regs[rd_rs1]<(uint16_t)simm); // Note: Comparison with unsigned immediate
+                regs[rd_rs1]=(regs[rd_rs1]<(uint16_t)simm); 
             else if(funct3 == 0x3) // Shift immediates
             {
                 uint8_t shamt = imm7 & 0x7; // Shift amount (3 bits for 16-bit shift)
@@ -441,7 +385,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                     regs[rd_rs1]= (uint16_t)(((int16_t)regs[rd_rs1]) >> shamt);
                 else {
                     std::cerr << "Unknown I-Type Shift instruction at PC 0x" << std::hex << pc << std::dec << "\n";
-                    return 0; // Terminate on unknown instruction
+                    return 0; 
                 }
             }
             else if(funct3 == 0x4) // ori
@@ -456,118 +400,6 @@ int z16sim::executeInstruction(uint16_t inst) {
             std::cout << "PC: " << pc << std::endl;
             break;
         }
-        // Fixed B-type (Branch) instruction handling in executeInstruction
-    // case 0x2: { // B-type (Branch)
-    //     uint8_t offset_val = (inst >> 12) & 0xF; // 4-bit offset
-    //     uint8_t rs1 = (inst >> 6) & 0x7;
-    //     uint8_t rs2 = (inst >> 9) & 0x7;
-    //     uint8_t funct3 = (inst >> 3) & 0x7;
-
-    //     // Sign extend the 4-bit offset
-    //     int16_t simm_offset = (offset_val & 0x8) ? (offset_val | 0xFFF0) : offset_val;
-    //     simm_offset <<= 1; // Scale offset by 2 for 16-bit instruction alignment
-
-    //     bool branch_taken = false;
-    //     switch (funct3) {
-    //         case 0x0: // BEQ
-    //             if (regs[rs1] == regs[rs2]) branch_taken = true;
-    //             break;
-    //         case 0x1: // BNE
-    //             if (regs[rs1] != regs[rs2]) branch_taken = true;
-    //             break;
-    //         case 0x2: // BZ
-    //             if (regs[rs1] == 0) branch_taken = true;
-    //             break;
-    //         case 0x3: // BNZ
-    //             if (regs[rs1] != 0) branch_taken = true;
-    //             break;
-    //         case 0x4: // BLT (signed)
-    //             if ((int16_t)regs[rs1] < (int16_t)regs[rs2]) branch_taken = true;
-    //             break;
-    //         case 0x5: // BGE (signed)
-    //             if ((int16_t)regs[rs1] >= (int16_t)regs[rs2]) branch_taken = true;
-    //             break;
-    //         case 0x6: // BLTU (unsigned)
-    //             if (regs[rs1] < regs[rs2]) branch_taken = true;
-    //             break;
-    //         case 0x7: // BGEU (unsigned)
-    //             if (regs[rs1] >= regs[rs2]) branch_taken = true;
-    //             break;
-    //         default:
-    //             std::cerr << "Unknown branch funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
-    //             return 0; // Terminate
-    //     }
-
-    //     if (branch_taken) {
-    //         // Branch offset is relative to current instruction address
-    //         // pc currently points to the instruction being executed
-    //         uint16_t target_addr = pc + simm_offset;
-    //         pc = target_addr;
-    //         pcUpdated = true;
-
-    //         // Debug output to verify branch behavior
-    //         if (debug) {
-    //             std::cout << "Branch taken from 0x" << std::hex << (pc - simm_offset)
-    //                     << " to 0x" << pc << std::dec << " (offset: " << simm_offset << ")\n";
-    //         }
-    //     }
-    //     break;
-//     case 0x2: { // B-type (Branch)
-//     uint8_t offset_val = (inst >> 12) & 0xF; // 4-bit offset
-//     uint8_t rs1 = (inst >> 6) & 0x7;
-//     uint8_t rs2 = (inst >> 9) & 0x7;
-//     uint8_t funct3 = (inst >> 3) & 0x7;
-
-//     // Sign extend the 4-bit offset
-//     int16_t simm_offset = (offset_val & 0x8) ? (offset_val | 0xFFF0) : offset_val;
-//     simm_offset <<= 1; // Scale offset by 2 for 16-bit instruction alignment
-
-//     bool branch_taken = false;
-//     switch (funct3) {
-//         case 0x0: // BEQ
-//             if (regs[rs1] == regs[rs2]) branch_taken = true;
-//             break;
-//         case 0x1: // BNE
-//             if (regs[rs1] != regs[rs2]) branch_taken = true;
-//             break;
-//         case 0x2: // BZ
-//             if (regs[rs1] == 0) branch_taken = true;
-//             break;
-//         case 0x3: // BNZ
-//             if (regs[rs1] != 0) branch_taken = true;
-//             break;
-//         case 0x4: // BLT (signed)
-//             if ((int16_t)regs[rs1] < (int16_t)regs[rs2]) branch_taken = true;
-//             break;
-//         case 0x5: // BGE (signed)
-//             if ((int16_t)regs[rs1] >= (int16_t)regs[rs2]) branch_taken = true;
-//             break;
-//         case 0x6: // BLTU (unsigned)
-//             if (regs[rs1] < regs[rs2]) branch_taken = true;
-//             break;
-//         case 0x7: // BGEU (unsigned)
-//             if (regs[rs1] >= regs[rs2]) branch_taken = true;
-//             break;
-//         default:
-//             std::cerr << "Unknown branch funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
-//             return 0; // Terminate
-//     }
-
-//     if (branch_taken) {
-//         // Branch offset is relative to current instruction address
-//         // pc currently points to the instruction being executed
-//         uint16_t target_addr = pc + 2*simm_offset;
-//         pc = target_addr;
-//         pcUpdated = true;
-
-//         // Debug output to verify branch behavior
-//         if (debug) {
-//             std::cout << "Branch taken from 0x" << std::hex << (pc - simm_offset)
-//                       << " to 0x" << pc << std::dec << " (offset: " << simm_offset << ")\n";
-//         }
-//     }
-//     break;
-// }
 
     case 0x2: { // B-type (Branch)
         uint8_t offset_val = (inst >> 12) & 0xF; // imm[4:1] (4-bit signed offset high bits)
@@ -608,7 +440,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                 break;
             default:
                 std::cerr << "Unknown branch funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
-                return 0; // Terminate or handle error
+                return 0; 
         }
 
         if (branch_taken) {
@@ -637,7 +469,7 @@ int z16sim::executeInstruction(uint16_t inst) {
             // Basic memory bounds check for store
             if (effective_address >= MEM_SIZE || (funct3 == 0x1 && (effective_address + 1 >= MEM_SIZE))) {
                 std::cerr << "Error: Memory access out of bounds for store at 0x" << std::hex << effective_address << std::dec << " at PC 0x" << std::hex << pc << std::dec << ".\n";
-                return 0; // Terminate simulation
+                return 0;
             }
 
             if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
@@ -706,31 +538,7 @@ int z16sim::executeInstruction(uint16_t inst) {
             }
             break;
         }
-        // case 0x5: { // J-type (Jump)
-        //     uint8_t f = (inst >> 15) & 0x1;
-        //     uint8_t imm9_4 = (inst >> 9) & 0x3F;
-        //     uint8_t rd = (inst >> 6) & 0x7;
-        //     uint8_t imm3_1 = (inst >> 3) & 0x7;
 
-        //     // Reconstruct the 10-bit immediate *value* from the instruction bits.
-        //     // This 'imm_val' is the 'offset' as described in the README's J-type format.
-        //     int16_t imm_val = (imm9_4 << 3) | imm3_1; // 9 bits for actual value, bit 0 is always 0 as instruction is 2-byte aligned
-        //     int16_t jump_offset = (imm9_4 << 4) | (imm3_1 << 1); // This is the value '4' for 'j 4'
-
-        //     // Sign-extend the jump_offset (which is supposed to be 10 bits if you look at the shifts)
-        //     if (jump_offset & 0x200) // If 10th bit is set for signed
-        //         jump_offset |= 0xFC00; // Sign extend to 16 bits
-
-        //     if (f == 0) { // j (unconditional jump)
-        //         pc += (jump_offset * 2); // Apply the offset * 2
-        //     }
-        //     else { // jal (jump and link)
-        //         regs[rd] = pc + 2; // Store return address
-        //         pc += (jump_offset * 2);   // Apply the offset * 2
-        //     }
-        //     pcUpdated = true;
-        //     break;
-        // }
         case 0x5: { // J-type (Jump)
             uint8_t f = (inst >> 15) & 0x1;
             uint8_t imm9_4 = (inst >> 9) & 0x3F;
@@ -754,21 +562,6 @@ int z16sim::executeInstruction(uint16_t inst) {
             break;
         }
 
-        // case 0x6: { // U-type (Upper immediate)
-        //     uint8_t f = (inst >> 15) & 0x1;
-        //     uint8_t rd  = (inst >> 6) & 0x7;
-        //     uint16_t I_upper = (inst >> 9) & 0x3F; // 6-bit immediate from bits [14:9]
-        //     uint16_t I_lower = (inst >> 3) & 0x7; // 3 bit immediate
-        //     uint16_t imm_15_7 = (I_upper << 3) | I_lower;
-        //     uint16_t imm = imm_15_7 << 7;
-
-
-        //     if (f == 0)    // lui (load upper immediate)
-        //         regs[rd] = imm; 
-        //     else        // auipc (add upper immediate to PC)
-        //         regs[rd] = pc + imm; // Add PC-relative immediate
-        //     break;
-        // }
         case 0x6: { // U-type (Upper immediate)
             uint8_t f = (inst >> 15) & 0x1;
             uint8_t rd  = (inst >> 6) & 0x7;
@@ -803,7 +596,7 @@ int z16sim::executeInstruction(uint16_t inst) {
         }
         default:
             std::cerr << "Unknown instruction opcode 0x" << std::hex << (int)opcode << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
-            return 0; // Terminate on unknown opcode
+            return 0;
     }
 
     if(!pcUpdated)
@@ -839,172 +632,8 @@ bool z16sim::cycle() {
     return true; // Continue to next cycle
 }
 
-// void z16sim::initGraphics() {
-//     std::cout << "HEREEEEE AT BEGINNING OF INITGRAPHICS" << std::endl;
-//     if (graphicsInitialized) return;
-
-//     // Create window
-//     window.create(sf::VideoMode(640, 480), "ZX16 Simulator");
-//     window.setFramerateLimit(60);
-    
-//     // Create texture for screen
-//     screenTexture.create(320, 240);
-//     screenSprite.setTexture(screenTexture);
-//     screenSprite.setScale(2.0f, 2.0f); // 2x scale for visibility
-    
-//     // Initialize default palette
-//     colorPalette[0] = 0x00;   // Black
-//     colorPalette[1] = 0x1C;   // Red
-//     colorPalette[2] = 0xE0;   // Green
-//     colorPalette[3] = 0xFC;   // Yellow
-//     colorPalette[4] = 0x03;   // Blue
-//     colorPalette[5] = 0x1F;   // Magenta
-//     colorPalette[6] = 0xE3;  // Cyan
-//     colorPalette[7] = 0xFF;   // White
-    
-//     graphicsInitialized = true;
-
-//     std::cout << "SFML Graphics initialized: 320x240 display (scaled 2x)" << std::endl;
-// }
-
-// void z16sim::updateGraphicsMemory(uint16_t addr, uint8_t value) {
-//     std::cout << "HEEEREE AT BEGINNING OF UPDATEGRAPHICSMEMORY" << std::endl;
-//     if (!graphicsMemoryAccessed) {
-//         graphicsMemoryAccessed = true;
-//         std::cout << "haallloooooo" << std::endl;
-//         initGraphics();
-//     }
-//         // if (addr >= 0xF000 && addr <= 0xF12B) {
-//         if (addr >= 0x0000 && addr <= 0x012B) {
-//         // Tile map update
-//         // tileMap[addr - 0xF000] = value;
-//         std::cout << "tile map updateee" << std::endl;
-//         // tileMap[addr] = value;
-//         tileMap[addr - 0x0000] = value; 
-//         screenNeedsUpdate = true;
-//     }
-
-
-
-//     // else if (addr >= 0xF200 && addr <= 0xF9FF) {
-//     else if (addr >= 0x012C && addr <= 0x092B) {
-//         // Tile data update
-//         std::cout << "tile data updateee" << std::endl;
-//         // int tileIndex = (addr - 0xF200) / 128;
-//         // int byteOffset = (addr - 0xF200) % 128;
-//         int tileIndex = (addr - 0x012C) / 128;
-//         int byteOffset = (addr - 0x012C) % 128;
-//         if (tileIndex < 16) {
-//             tileData[tileIndex][byteOffset] = value;
-//             screenNeedsUpdate = true;
-//         }
-//     }
-//     // else if (addr >= 0xFA00 && addr <= 0xFA0F) {
-//     else if (addr >= 0x092C && addr <= 0x093B) {
-//         // Color palette update
-//         std::cout << "color palette updateee" << std::endl;
-//         // colorPalette[addr - 0xFA00] = value;
-//         colorPalette[addr - 0x092C] = value;
-//         screenNeedsUpdate = true;
-//     }
-// }
-
-
-// sf::Color z16sim::paletteToColor(uint8_t colorIndex) {
-//     if (colorIndex >= 16) colorIndex = 0;
-    
-//     uint8_t colorByte = colorPalette[colorIndex];
-//     uint8_t r = ((colorByte >> 5) & 0x7) * 36;  // 3 bits -> 0-255
-//     uint8_t g = ((colorByte >> 2) & 0x7) * 36;  // 3 bits -> 0-255
-//     uint8_t b = (colorByte & 0x3) * 85;         // 2 bits -> 0-255
-    
-//     return sf::Color(r, g, b);
-// }
-
-// void z16sim::renderTile(int tileIndex, int screenX, int screenY) {
-//     if (tileIndex >= 16) return;
-    
-//     for (int y = 0; y < 16; y++) {
-//         for (int x = 0; x < 16; x += 2) {
-//             int byteIndex = y * 8 + x / 2;
-//             uint8_t pixelPair = tileData[tileIndex][byteIndex];
-            
-//             uint8_t pixel0Color = pixelPair & 0x0F;
-//             uint8_t pixel1Color = (pixelPair >> 4) & 0x0F;
-            
-//             sf::Color color0 = paletteToColor(pixel0Color);
-//             sf::Color color1 = paletteToColor(pixel1Color);
-            
-//             // Set pixels in frame buffer
-//             int fbIndex0 = ((screenY + y) * 320 + (screenX + x)) * 4;
-//             int fbIndex1 = ((screenY + y) * 320 + (screenX + x + 1)) * 4;
-            
-//             if (fbIndex0 < 320 * 240 * 4) {
-//                 frameBuffer[fbIndex0] = color0.r;
-//                 frameBuffer[fbIndex0 + 1] = color0.g;
-//                 frameBuffer[fbIndex0 + 2] = color0.b;
-//                 frameBuffer[fbIndex0 + 3] = 255;
-//             }
-            
-//             if (fbIndex1 < 320 * 240 * 4) {
-//                 frameBuffer[fbIndex1] = color1.r;
-//                 frameBuffer[fbIndex1 + 1] = color1.g;
-//                 frameBuffer[fbIndex1 + 2] = color1.b;
-//                 frameBuffer[fbIndex1 + 3] = 255;
-//             }
-//         }
-//     }
-// }
-
-// void z16sim::renderScreen() {
-//     if (!screenNeedsUpdate) return;
-    
-//     // Clear frame buffer
-//     memset(frameBuffer, 0, sizeof(frameBuffer));
-    
-//     // Render each tile position
-//     for (int row = 0; row < 15; row++) {
-//         for (int col = 0; col < 20; col++) {
-//             int tileMapIndex = row * 20 + col;
-//             uint8_t tileIndex = tileMap[tileMapIndex];
-//             renderTile(tileIndex, col * 16, row * 16);
-//         }
-//     }
-    
-//     // Update SFML texture
-//     screenTexture.update(frameBuffer);
-//     screenNeedsUpdate = false;
-// }
-
-// bool z16sim::handleEvents() {
-//     sf::Event event;
-//     while (window.pollEvent(event)) {
-//         if (event.type == sf::Event::Closed) {
-//             return false;
-//         }
-//         if (event.type == sf::Event::KeyPressed) {
-//             if (event.key.code == sf::Keyboard::Escape) {
-//                 return false;
-//             }
-//         }
-//     }
-//     return true;
-// }
-
-// void z16sim::cleanup() {
-//     if (window.isOpen()) {
-//         window.close();
-//     }
-// }
-
-// bool z16sim::needsGraphics() const {
-//     std::cout << "i am in needsGraphics" << std::endl;
-//     std::cout << "graphicsMemoryAccessed: " << graphicsMemoryAccessed << std::endl;
-//     return graphicsMemoryAccessed;
-// }
-
 int main(int argc, char **argv) {
-    z16sim simulator; // Create an instance of your simulator
+    z16sim simulator; 
     bool interactive_mode = false;
     std::string machine_code_file;
 
@@ -1019,32 +648,38 @@ int main(int argc, char **argv) {
         if (std::string(argv[1]) == "-i") {
             interactive_mode = true;
             machine_code_file = argv[2];
-        } else {
+        } 
+
+        else {
             std::cerr << "Unknown option: " << argv[1] << "\n";
             std::cerr << "Usage: " << argv[0] << " <machine_code_file>\n";
             std::cerr << "       " << argv[0] << " -i <machine_code_file> (for interactive/step-by-step mode)\n";
             return 1;
         }
-    } else { // argc == 2
+
+    } 
+    
+    else { // argc == 2
         machine_code_file = argv[1];
     }
+
 
     // --- 2. Load Memory ---
     try {
         simulator.loadMemoryFromFile(machine_code_file.c_str());
         // This message will be part of the initial output captured by the backend
         std::cout << "Loaded machine code from " << machine_code_file << std::endl;
-    } catch (const std::runtime_error& e) {
+    } 
+    
+    catch (const std::runtime_error& e) {
         std::cerr << e.what() << std::endl;
         return 1;
     }
 
+
     // --- 3. Handle Simulation Modes ---
     if (!interactive_mode) {
         // --- Full Simulation Mode ---
-        // In this mode, the simulator runs until completion or halt.
-        // The `simulator.cycle()` method should print any desired output (disassembly, debug info)
-        // based on its internal flags.
         std::cout << "Starting full simulation..." << std::endl;
         simulator.setDebug(true); // Enable debug output for full simulation too
         bool programRunning = true;
@@ -1052,7 +687,8 @@ int main(int argc, char **argv) {
         while (programRunning) {
             if (simulator.graphics.needsGraphics()){
                 std::cout << "if you see this then needsGraphics returned true" << std::endl;
-                if (!simulator.graphics.handleEvents()) break;
+                if (!simulator.graphics.handleEvents()) 
+                    break;
                 else std::cout << "if you see this then handleEvents returned true" << std::endl;
             }
 
@@ -1064,8 +700,9 @@ int main(int argc, char **argv) {
                         std::cout << "Press ESC or close window to exit." << std::endl;
 
                         while (simulator.graphics.window.isOpen()) {
-                            if (!simulator.graphics.handleEvents()) break;
-                            // std::cout << "in heeeereeee" << std::endl;
+                            if (!simulator.graphics.handleEvents()) 
+                                break;
+
                             simulator.graphics.renderScreen();
                             simulator.graphics.window.clear();
                             simulator.graphics.window.draw(simulator.graphics.screenSprite);
@@ -1073,6 +710,7 @@ int main(int argc, char **argv) {
                             sf::sleep(sf::milliseconds(100));
                         }
                     }
+
                 break;
     
             }
@@ -1087,16 +725,10 @@ int main(int argc, char **argv) {
                 }
         }
 
-            // while(simulator.cycle()) {
-            //     // Loop continues as long as simulator.cycle() returns true (not halted)
-            // }
-            // std::cout << "Full simulation finished." << std::endl;
+    } 
 
-        } 
     else {
         // --- Interactive/Step-by-Step Mode ---
-        // In this mode, the simulator executes one instruction per input from the backend.
-        // `setDebug(true)` is crucial here to ensure `cycle()` prints register/memory state.
         simulator.setDebug(true);
 
         std::cout << "Starting interactive simulation." << std::endl;
@@ -1104,7 +736,7 @@ int main(int argc, char **argv) {
 
         // After initial setup and printing the initial state, signal readiness
         std::cout << "READY_FOR_STEP" << std::endl;
-        std::cout.flush(); // Ensure this is sent immediately
+        std::cout.flush();
 
         std::string line_input;
         while(true) {
@@ -1122,16 +754,13 @@ int main(int argc, char **argv) {
             }
 
 
-            if (simulator.graphics.needsGraphics() && !simulator.graphics.handleEvents()) break;
+            if (simulator.graphics.needsGraphics() && !simulator.graphics.handleEvents()) 
+                break;
 
             // Execute one simulation cycle (one instruction)
-            // The simulator.cycle() method, because debug is true, should print
-            // the disassembled instruction and the updated register state.
             if (!simulator.cycle()) {
                 // If cycle() returns false, it means the simulation has halted (e.g., reached HLT instruction).
                 std::cout << "Simulation halted." << std::endl;
-                // No need to send READY_FOR_STEP if the simulation has finished;
-                // the process will terminate, and the backend will detect it.
                 break;
             }
 
@@ -1145,7 +774,7 @@ int main(int argc, char **argv) {
 
             // If the simulation is still running, signal readiness for the next step
             std::cout << "READY_FOR_STEP" << std::endl;
-            std::cout.flush(); // Ensure this is sent immediately
+            std::cout.flush();
         }
         std::cout << "Interactive simulation finished." << std::endl;
     }
