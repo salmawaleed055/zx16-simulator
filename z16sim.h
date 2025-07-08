@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>        
 #include <SFML/Graphics.hpp> 
+#include "graphics.h"
 
 class z16sim {
 private:
@@ -30,16 +31,6 @@ private:
     // Helper methods (commented out if not used or if you implement them)
     // void initializeRegisterMap();
     // int getRegisterIndex(const std::string& regName);
-
-    // Graphics members
-    sf::Texture screenTexture;
-    sf::Uint8 frameBuffer[320 * 240 * 4]; // RGBA pixels
-    uint8_t tileMap[300];                  // 20x15 tiles
-    uint8_t tileData[16][128];             // 16 tiles, 128 bytes each
-    uint8_t colorPalette[16];              // 16 colors
-    bool screenNeedsUpdate;
-    bool graphicsInitialized;
-    bool graphicsMemoryAccessed;
 
 public:
     z16sim(); // Constructor
@@ -71,17 +62,8 @@ public:
         return 0; // Or throw an error
     }
 
-    // Graphics methods
-    void initGraphics();
-    void updateGraphicsMemory(uint16_t addr, uint8_t value);
-    void renderScreen();
-    void renderTile(int tileIndex, int screenX, int screenY);
-    sf::Color paletteToColor(uint8_t colorIndex);
-    void cleanup();
-    bool handleEvents();
-    bool needsGraphics() const;
-    sf::RenderWindow window;
-    sf::Sprite screenSprite;
+
+    Graphics graphics; // instance of graphics class
 
 };
 

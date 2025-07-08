@@ -1,10 +1,10 @@
-#include "z16sim.h" // Include your header file
+#include "z16sim.h" 
+#include "graphics.h"
 #include <iostream>  // For std::cout, std::cerr
 #include <iomanip>   // For std::hex, std::setw, std::setfill
 #include <stdexcept> // For std::runtime_error
 #include <cstdio>    // For snprintf, fopen, fread, ferror, fclose
 #include <cstring>
-
 
 // Initialize static member (outside class definition)
 const char* z16sim::regNames[z16sim::NUM_REGS] = {"t0", "ra", "sp", "s0", "s1", "t1", "a0", "a1"};
@@ -17,15 +17,15 @@ z16sim::z16sim() : pc(0), debug(false) {
 
 
     // Initialize graphics memory
-    memset(tileMap, 0, sizeof(tileMap));
-    memset(tileData, 0, sizeof(tileData));
-    memset(colorPalette, 0, sizeof(colorPalette));
-    memset(frameBuffer, 0, sizeof(frameBuffer));
-    screenNeedsUpdate = true;
-    graphicsInitialized = false;
-    graphicsMemoryAccessed = false;
-
+    memset(graphics.tileMap, 0, sizeof(graphics.tileMap));
+    memset(graphics.tileData, 0, sizeof(graphics.tileData));
+    memset(graphics.colorPalette, 0, sizeof(graphics.colorPalette));
+    memset(graphics.frameBuffer, 0, sizeof(graphics.frameBuffer));
+    graphics.screenNeedsUpdate = true;
+    graphics.graphicsInitialized = false;
+    graphics.graphicsMemoryAccessed = false;
 }
+
 
 
 // Resets the simulator state
@@ -584,19 +584,24 @@ int z16sim::executeInstruction(uint16_t inst) {
             }
 
             if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
-                updateGraphicsMemory(effective_address, regs[rs2] & 0xFF);
+                graphics.updateGraphicsMemory(effective_address, regs[rs2] & 0xFF);
             }
 
             switch (funct3) {
                 case 0x0: // sb (store byte)
                     memory[effective_address] = (uint8_t)(regs[rs2] & 0xFF);
+                    std::cout << "effective address: " << effective_address << std::endl;
+                    if (effective_address >= 0x0000 && effective_address <= 0x093B) {
+                    graphics.updateGraphicsMemory(effective_address + 1, (regs[rs2] >> 8) & 0xFF);
+                    }
+
                     break;
                 case 0x1: // sw (store word - 16-bit)
                     memory[effective_address] = regs[rs2] & 0xFF;         // Lower byte
                     memory[effective_address + 1] = (regs[rs2] >> 8) & 0xFF; // Upper byte
 
-                    if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
-                    updateGraphicsMemory(effective_address + 1, (regs[rs2] >> 8) & 0xFF);
+                    if (effective_address >= 0x0000 && effective_address <= 0x093B) {
+                    graphics.updateGraphicsMemory(effective_address + 1, (regs[rs2] >> 8) & 0xFF);
                     }
 
                     break;
@@ -743,159 +748,169 @@ bool z16sim::cycle() {
     return true; // Continue to next cycle
 }
 
-void z16sim::initGraphics() {
-    std::cout << "HEREEEEE AT BEGINNING OF INITGRAPHICS" << std::endl;
-    if (graphicsInitialized) return;
+// void z16sim::initGraphics() {
+//     std::cout << "HEREEEEE AT BEGINNING OF INITGRAPHICS" << std::endl;
+//     if (graphicsInitialized) return;
 
-    // Create window
-    window.create(sf::VideoMode(640, 480), "ZX16 Simulator");
-    window.setFramerateLimit(60);
+//     // Create window
+//     window.create(sf::VideoMode(640, 480), "ZX16 Simulator");
+//     window.setFramerateLimit(60);
     
-    // Create texture for screen
-    screenTexture.create(320, 240);
-    screenSprite.setTexture(screenTexture);
-    screenSprite.setScale(2.0f, 2.0f); // 2x scale for visibility
+//     // Create texture for screen
+//     screenTexture.create(320, 240);
+//     screenSprite.setTexture(screenTexture);
+//     screenSprite.setScale(2.0f, 2.0f); // 2x scale for visibility
     
-    // Initialize default palette
-    colorPalette[0] = 0x00;   // Black
-    colorPalette[1] = 0x1C;   // Red
-    colorPalette[2] = 0xE0;   // Green
-    colorPalette[3] = 0xFC;   // Yellow
-    colorPalette[4] = 0x03;   // Blue
-    colorPalette[5] = 0x1F;   // Magenta
-    colorPalette[6] = 0xE3;   // Cyan
-    colorPalette[7] = 0xFF;   // White
+//     // Initialize default palette
+//     colorPalette[0] = 0x00;   // Black
+//     colorPalette[1] = 0x1C;   // Red
+//     colorPalette[2] = 0xE0;   // Green
+//     colorPalette[3] = 0xFC;   // Yellow
+//     colorPalette[4] = 0x03;   // Blue
+//     colorPalette[5] = 0x1F;   // Magenta
+//     colorPalette[6] = 0xE3;  // Cyan
+//     colorPalette[7] = 0xFF;   // White
     
-    graphicsInitialized = true;
+//     graphicsInitialized = true;
 
-    std::cout << "SFML Graphics initialized: 320x240 display (scaled 2x)" << std::endl;
-}
+//     std::cout << "SFML Graphics initialized: 320x240 display (scaled 2x)" << std::endl;
+// }
 
-void z16sim::updateGraphicsMemory(uint16_t addr, uint8_t value) {
-    std::cout << "HEEEREE AT BEGINNING OF UPDATEGRAPHICSMEMORY" << std::endl;
-    if (!graphicsMemoryAccessed) {
-        graphicsMemoryAccessed = true;
-        std::cout << "haallloooooo" << std::endl;
-        initGraphics();
-    }
-        if (addr >= 0xF000 && addr <= 0xF12B) {
-        // Tile map update
-        // tileMap[addr - 0xF000] = value;
-        std::cout << "tile map updateee" << std::endl;
-        tileMap[addr] = value;
-        screenNeedsUpdate = true;
-    }
-    else if (addr >= 0xF200 && addr <= 0xF9FF) {
-        // Tile data update
-        std::cout << "tile data updateee" << std::endl;
-        int tileIndex = (addr - 0xF200) / 128;
-        int byteOffset = (addr - 0xF200) % 128;
-        if (tileIndex < 16) {
-            tileData[tileIndex][byteOffset] = value;
-            screenNeedsUpdate = true;
-        }
-    }
-    else if (addr >= 0xFA00 && addr <= 0xFA0F) {
-        // Color palette update
-        std::cout << "color palette updateee" << std::endl;
-        colorPalette[addr - 0xFA00] = value;
-        screenNeedsUpdate = true;
-    }
-}
+// void z16sim::updateGraphicsMemory(uint16_t addr, uint8_t value) {
+//     std::cout << "HEEEREE AT BEGINNING OF UPDATEGRAPHICSMEMORY" << std::endl;
+//     if (!graphicsMemoryAccessed) {
+//         graphicsMemoryAccessed = true;
+//         std::cout << "haallloooooo" << std::endl;
+//         initGraphics();
+//     }
+//         // if (addr >= 0xF000 && addr <= 0xF12B) {
+//         if (addr >= 0x0000 && addr <= 0x012B) {
+//         // Tile map update
+//         // tileMap[addr - 0xF000] = value;
+//         std::cout << "tile map updateee" << std::endl;
+//         // tileMap[addr] = value;
+//         tileMap[addr - 0x0000] = value; 
+//         screenNeedsUpdate = true;
+//     }
 
 
-sf::Color z16sim::paletteToColor(uint8_t colorIndex) {
-    if (colorIndex >= 16) colorIndex = 0;
-    
-    uint8_t colorByte = colorPalette[colorIndex];
-    uint8_t r = ((colorByte >> 5) & 0x7) * 36;  // 3 bits -> 0-255
-    uint8_t g = ((colorByte >> 2) & 0x7) * 36;  // 3 bits -> 0-255
-    uint8_t b = (colorByte & 0x3) * 85;         // 2 bits -> 0-255
-    
-    return sf::Color(r, g, b);
-}
 
-void z16sim::renderTile(int tileIndex, int screenX, int screenY) {
-    if (tileIndex >= 16) return;
+//     // else if (addr >= 0xF200 && addr <= 0xF9FF) {
+//     else if (addr >= 0x012C && addr <= 0x092B) {
+//         // Tile data update
+//         std::cout << "tile data updateee" << std::endl;
+//         // int tileIndex = (addr - 0xF200) / 128;
+//         // int byteOffset = (addr - 0xF200) % 128;
+//         int tileIndex = (addr - 0x012C) / 128;
+//         int byteOffset = (addr - 0x012C) % 128;
+//         if (tileIndex < 16) {
+//             tileData[tileIndex][byteOffset] = value;
+//             screenNeedsUpdate = true;
+//         }
+//     }
+//     // else if (addr >= 0xFA00 && addr <= 0xFA0F) {
+//     else if (addr >= 0x092C && addr <= 0x093B) {
+//         // Color palette update
+//         std::cout << "color palette updateee" << std::endl;
+//         // colorPalette[addr - 0xFA00] = value;
+//         colorPalette[addr - 0x092C] = value;
+//         screenNeedsUpdate = true;
+//     }
+// }
+
+
+// sf::Color z16sim::paletteToColor(uint8_t colorIndex) {
+//     if (colorIndex >= 16) colorIndex = 0;
     
-    for (int y = 0; y < 16; y++) {
-        for (int x = 0; x < 16; x += 2) {
-            int byteIndex = y * 8 + x / 2;
-            uint8_t pixelPair = tileData[tileIndex][byteIndex];
+//     uint8_t colorByte = colorPalette[colorIndex];
+//     uint8_t r = ((colorByte >> 5) & 0x7) * 36;  // 3 bits -> 0-255
+//     uint8_t g = ((colorByte >> 2) & 0x7) * 36;  // 3 bits -> 0-255
+//     uint8_t b = (colorByte & 0x3) * 85;         // 2 bits -> 0-255
+    
+//     return sf::Color(r, g, b);
+// }
+
+// void z16sim::renderTile(int tileIndex, int screenX, int screenY) {
+//     if (tileIndex >= 16) return;
+    
+//     for (int y = 0; y < 16; y++) {
+//         for (int x = 0; x < 16; x += 2) {
+//             int byteIndex = y * 8 + x / 2;
+//             uint8_t pixelPair = tileData[tileIndex][byteIndex];
             
-            uint8_t pixel0Color = pixelPair & 0x0F;
-            uint8_t pixel1Color = (pixelPair >> 4) & 0x0F;
+//             uint8_t pixel0Color = pixelPair & 0x0F;
+//             uint8_t pixel1Color = (pixelPair >> 4) & 0x0F;
             
-            sf::Color color0 = paletteToColor(pixel0Color);
-            sf::Color color1 = paletteToColor(pixel1Color);
+//             sf::Color color0 = paletteToColor(pixel0Color);
+//             sf::Color color1 = paletteToColor(pixel1Color);
             
-            // Set pixels in frame buffer
-            int fbIndex0 = ((screenY + y) * 320 + (screenX + x)) * 4;
-            int fbIndex1 = ((screenY + y) * 320 + (screenX + x + 1)) * 4;
+//             // Set pixels in frame buffer
+//             int fbIndex0 = ((screenY + y) * 320 + (screenX + x)) * 4;
+//             int fbIndex1 = ((screenY + y) * 320 + (screenX + x + 1)) * 4;
             
-            if (fbIndex0 < 320 * 240 * 4) {
-                frameBuffer[fbIndex0] = color0.r;
-                frameBuffer[fbIndex0 + 1] = color0.g;
-                frameBuffer[fbIndex0 + 2] = color0.b;
-                frameBuffer[fbIndex0 + 3] = 255;
-            }
+//             if (fbIndex0 < 320 * 240 * 4) {
+//                 frameBuffer[fbIndex0] = color0.r;
+//                 frameBuffer[fbIndex0 + 1] = color0.g;
+//                 frameBuffer[fbIndex0 + 2] = color0.b;
+//                 frameBuffer[fbIndex0 + 3] = 255;
+//             }
             
-            if (fbIndex1 < 320 * 240 * 4) {
-                frameBuffer[fbIndex1] = color1.r;
-                frameBuffer[fbIndex1 + 1] = color1.g;
-                frameBuffer[fbIndex1 + 2] = color1.b;
-                frameBuffer[fbIndex1 + 3] = 255;
-            }
-        }
-    }
-}
+//             if (fbIndex1 < 320 * 240 * 4) {
+//                 frameBuffer[fbIndex1] = color1.r;
+//                 frameBuffer[fbIndex1 + 1] = color1.g;
+//                 frameBuffer[fbIndex1 + 2] = color1.b;
+//                 frameBuffer[fbIndex1 + 3] = 255;
+//             }
+//         }
+//     }
+// }
 
-void z16sim::renderScreen() {
-    if (!screenNeedsUpdate) return;
+// void z16sim::renderScreen() {
+//     if (!screenNeedsUpdate) return;
     
-    // Clear frame buffer
-    memset(frameBuffer, 0, sizeof(frameBuffer));
+//     // Clear frame buffer
+//     memset(frameBuffer, 0, sizeof(frameBuffer));
     
-    // Render each tile position
-    for (int row = 0; row < 15; row++) {
-        for (int col = 0; col < 20; col++) {
-            int tileMapIndex = row * 20 + col;
-            uint8_t tileIndex = tileMap[tileMapIndex];
-            renderTile(tileIndex, col * 16, row * 16);
-        }
-    }
+//     // Render each tile position
+//     for (int row = 0; row < 15; row++) {
+//         for (int col = 0; col < 20; col++) {
+//             int tileMapIndex = row * 20 + col;
+//             uint8_t tileIndex = tileMap[tileMapIndex];
+//             renderTile(tileIndex, col * 16, row * 16);
+//         }
+//     }
     
-    // Update SFML texture
-    screenTexture.update(frameBuffer);
-    screenNeedsUpdate = false;
-}
+//     // Update SFML texture
+//     screenTexture.update(frameBuffer);
+//     screenNeedsUpdate = false;
+// }
 
-bool z16sim::handleEvents() {
-    sf::Event event;
-    while (window.pollEvent(event)) {
-        if (event.type == sf::Event::Closed) {
-            return false;
-        }
-        if (event.type == sf::Event::KeyPressed) {
-            if (event.key.code == sf::Keyboard::Escape) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
+// bool z16sim::handleEvents() {
+//     sf::Event event;
+//     while (window.pollEvent(event)) {
+//         if (event.type == sf::Event::Closed) {
+//             return false;
+//         }
+//         if (event.type == sf::Event::KeyPressed) {
+//             if (event.key.code == sf::Keyboard::Escape) {
+//                 return false;
+//             }
+//         }
+//     }
+//     return true;
+// }
 
-void z16sim::cleanup() {
-    if (window.isOpen()) {
-        window.close();
-    }
-}
+// void z16sim::cleanup() {
+//     if (window.isOpen()) {
+//         window.close();
+//     }
+// }
 
-bool z16sim::needsGraphics() const {
-    std::cout << "i am in needsGraphics" << std::endl;
-    std::cout << "graphicsMemoryAccessed: " << graphicsMemoryAccessed << std::endl;
-    return graphicsMemoryAccessed;
-}
+// bool z16sim::needsGraphics() const {
+//     std::cout << "i am in needsGraphics" << std::endl;
+//     std::cout << "graphicsMemoryAccessed: " << graphicsMemoryAccessed << std::endl;
+//     return graphicsMemoryAccessed;
+// }
 
 int main(int argc, char **argv) {
     z16sim simulator; // Create an instance of your simulator
@@ -944,9 +959,9 @@ int main(int argc, char **argv) {
         bool programRunning = true;
 
         while (programRunning) {
-            if (simulator.needsGraphics()){
+            if (simulator.graphics.needsGraphics()){
                 std::cout << "if you see this then needsGraphics returned true" << std::endl;
-                if (!simulator.handleEvents()) break;
+                if (!simulator.graphics.handleEvents()) break;
                 else std::cout << "if you see this then handleEvents returned true" << std::endl;
             }
 
@@ -954,15 +969,16 @@ int main(int argc, char **argv) {
                 programRunning = false;
                 std::cout << "Program execution completed." << std::endl;
 
-                if (simulator.needsGraphics()) {
+                if (simulator.graphics.needsGraphics()) {
                         std::cout << "Press ESC or close window to exit." << std::endl;
 
-                        while (simulator.window.isOpen()) {
-                            if (!simulator.handleEvents()) break;
-                            simulator.renderScreen();
-                            simulator.window.clear();
-                            simulator.window.draw(simulator.screenSprite);
-                            simulator.window.display();
+                        while (simulator.graphics.window.isOpen()) {
+                            if (!simulator.graphics.handleEvents()) break;
+                            // std::cout << "in heeeereeee" << std::endl;
+                            simulator.graphics.renderScreen();
+                            simulator.graphics.window.clear();
+                            simulator.graphics.window.draw(simulator.graphics.screenSprite);
+                            simulator.graphics.window.display();
                             sf::sleep(sf::milliseconds(100));
                         }
                     }
@@ -971,11 +987,11 @@ int main(int argc, char **argv) {
             }
 
             // Update graphics
-            if (simulator.needsGraphics()) {
-                    simulator.renderScreen();
-                    simulator.window.clear();
-                    simulator.window.draw(simulator.screenSprite);
-                    simulator.window.display();
+            if (simulator.graphics.needsGraphics()) {
+                    simulator.graphics.renderScreen();
+                    simulator.graphics.window.clear();
+                    simulator.graphics.window.draw(simulator.graphics.screenSprite);
+                    simulator.graphics.window.display();
                     sf::sleep(sf::milliseconds(16)); // ~60 FPS
                 }
         }
@@ -1015,7 +1031,7 @@ int main(int argc, char **argv) {
             }
 
 
-            if (simulator.needsGraphics() && !simulator.handleEvents()) break;
+            if (simulator.graphics.needsGraphics() && !simulator.graphics.handleEvents()) break;
 
             // Execute one simulation cycle (one instruction)
             // The simulator.cycle() method, because debug is true, should print
@@ -1029,11 +1045,11 @@ int main(int argc, char **argv) {
             }
 
             // update graphics
-            if (simulator.needsGraphics()) {
-                simulator.renderScreen();
-                simulator.window.clear();
-                simulator.window.draw(simulator.screenSprite);
-                simulator.window.display();
+            if (simulator.graphics.needsGraphics()) {
+                simulator.graphics.renderScreen();
+                simulator.graphics.window.clear();
+                simulator.graphics.window.draw(simulator.graphics.screenSprite);
+                simulator.graphics.window.display();
             }
 
             // If the simulation is still running, signal readiness for the next step
@@ -1043,6 +1059,6 @@ int main(int argc, char **argv) {
         std::cout << "Interactive simulation finished." << std::endl;
     }
 
-    simulator.cleanup();
+    simulator.graphics.cleanup();
     return 0;
 }

@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(z16sim
     z16sim.cpp
+    graphics.cpp
 )
 
 target_link_libraries(z16sim PRIVATE sfml-graphics sfml-window sfml-system)
