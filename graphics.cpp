@@ -48,7 +48,6 @@ void Graphics::updateGraphicsMemory(uint16_t addr, uint8_t value) {
     }
 
 
-
     // else if (addr >= 0xF200 && addr <= 0xF9FF) {
     else if (addr >= 0x012C && addr <= 0x092B) {
         // Tile data update
@@ -73,6 +72,8 @@ void Graphics::updateGraphicsMemory(uint16_t addr, uint8_t value) {
 
     std::cout << "Writing value " << std::hex << (int)value
           << " to graphics address 0x" << addr << std::dec << std::endl;
+
+    if (screenNeedsUpdate) renderScreen();
 }
 
 
@@ -125,6 +126,7 @@ void Graphics::renderTile(int tileIndex, int screenX, int screenY) {
 
 
 void Graphics::renderScreen() {
+    // std::cout << "IN RENDER SCREEN" << std::endl;
     if (!screenNeedsUpdate) return;
     
     // Clear frame buffer
@@ -142,6 +144,8 @@ void Graphics::renderScreen() {
     // Update SFML texture
     screenTexture.update(frameBuffer);
     screenNeedsUpdate = false;
+
+    std::cout << "RENDERED SCREEN" << std::endl;
 }
 
 

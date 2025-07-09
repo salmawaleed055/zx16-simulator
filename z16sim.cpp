@@ -480,8 +480,10 @@ int z16sim::executeInstruction(uint16_t inst) {
                 case 0x0: // sb (store byte)
                     memory[effective_address] = (uint8_t)(regs[rs2] & 0xFF);
                     std::cout << "effective address: " << effective_address << std::endl;
+                    std::cout << "regs[rs2]: " << regs[rs2] << " rs2: " << rs2 << std::endl;
                     if (effective_address >= 0x0000 && effective_address <= 0x093B) {
-                    graphics.updateGraphicsMemory(effective_address + 1, (regs[rs2] >> 8) & 0xFF);
+                        graphics.updateGraphicsMemory(effective_address + 1, regs[rs2] & 0xFF);
+
                     }
 
                     break;
@@ -489,9 +491,9 @@ int z16sim::executeInstruction(uint16_t inst) {
                     memory[effective_address] = regs[rs2] & 0xFF;         // Lower byte
                     memory[effective_address + 1] = (regs[rs2] >> 8) & 0xFF; // Upper byte
 
-                    if (effective_address >= 0x0000 && effective_address <= 0x093B) {
-                    graphics.updateGraphicsMemory(effective_address + 1, (regs[rs2] >> 8) & 0xFF);
-                    }
+                    // if (effective_address >= 0x0000 && effective_address <= 0x093B) {
+                    // graphics.updateGraphicsMemory(effective_address + 1, (regs[rs2] >> 8) & 0xFF);
+                    // }
 
                     break;
                 default:
@@ -565,12 +567,15 @@ int z16sim::executeInstruction(uint16_t inst) {
         case 0x6: { // U-type (Upper immediate)
             uint8_t f = (inst >> 15) & 0x1;
             uint8_t rd  = (inst >> 6) & 0x7;
-            uint16_t I_upper = (inst >> 7) & 0xFF; // 8-bit immediate from bits [14:7]
+            // uint16_t I_upper = (inst >> 7) & 0xFF; // 8-bit immediate from bits [14:7]
+            uint16_t I_lower = (inst >> 3) & 0x7; // 3-bit immediate from bits [5:3]
+            uint16_t I_upper = (inst >> 9) & 0x3F; // 6-bit immediate from bits [14:9]
+            uint16_t imm = I_lower | (I_upper << 3);
 
-            if(f==0)    // lui (load upper immediate)
-                regs[rd] = (I_upper << 7); // Load upper 8 bits, shifted by 7 to align
+            if (f == 0)    // lui (load upper immediate)
+                regs[rd] = imm << 7; // Load upper 8 bits, shifted by 7 to align
             else        // auipc (add upper immediate to PC)
-                regs[rd] = pc + (I_upper << 7); // Add PC-relative immediate
+                regs[rd] = pc + (imm << 7); // Add PC-relative immediate
             break;
         }
         case 0x7: { // System instruction (ecall)
@@ -676,6 +681,13 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    
+    simulator.graphics.updateGraphicsMemory(0x0000, 0x01); // Assign tile 1 to first screen cell
+
+    // Fill tile 1 with visible pattern
+    for (int i = 0; i < 128; ++i) {
+        simulator.graphics.updateGraphicsMemory(0x012C + i, 0xFF); // solid white tile
+    }
 
     // --- 3. Handle Simulation Modes ---
     if (!interactive_mode) {
@@ -707,7 +719,7 @@ int main(int argc, char **argv) {
                             simulator.graphics.window.clear();
                             simulator.graphics.window.draw(simulator.graphics.screenSprite);
                             simulator.graphics.window.display();
-                            sf::sleep(sf::milliseconds(100));
+                            // sf::sleep(sf::milliseconds(100));
                         }
                     }
 
