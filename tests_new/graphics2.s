@@ -16,7 +16,7 @@ main:
     li s1, 0x44 # tile 0
     li s0, 63
     addi s0, 63
-    addi s0, 2
+    addi s0, 1
     li t0, 0 # counter
     add x0, x0
     loop:
@@ -28,10 +28,10 @@ main:
 
     done:
         li t1, 0x0000 # load tile map base address
-        li s1, 0x01
+        li s1, 0x00
         # lui s0, 0
         # ori s0, 0x12C
-        li s0, 300
+        li s0, 299
         li t0, 0 # counter
         add x0, x0
         loop2:

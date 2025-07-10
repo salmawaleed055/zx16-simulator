@@ -97,7 +97,7 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "clr %s", regNames[rd_rs1]);
             }
             // RET: JR x1 (jump register with ra)
-            else if (funct3 == 0x0 && funct4 == 0x4 && rs2 == 1) {
+            else if (funct3 == 0x0 && funct4 == 0xB  && rd_rs1 == 1 && rs2 == 0) {
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "ret");
             }
             // CALL: JALR x1, rs2 (jump and link with ra as destination)
@@ -113,9 +113,9 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "slt %s, %s", regNames[rd_rs1], regNames[rs2]);
             else if(funct3 == 0x2)
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "sltu %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if (funct3 == 0x3 && funct4 == 0x2)
-                snprintf(temp_instr_str, sizeof(temp_instr_str), "sll %s, %s", regNames[rd_rs1], regNames[rs2]);
             else if (funct3 == 0x3 && funct4 == 0x4)
+                snprintf(temp_instr_str, sizeof(temp_instr_str), "sll %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if (funct3 == 0x3 && funct4 == 0x5)
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "srl %s, %s", regNames[rd_rs1], regNames[rs2]);
             else if (funct3 == 0x3 && funct4 == 0x8)
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "sra %s, %s", regNames[rd_rs1], regNames[rs2]);
@@ -127,9 +127,9 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "xor %s, %s", regNames[rd_rs1], regNames[rs2]);
             else if (funct3 == 0x7)
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "mv %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if (funct3 == 0x0 && funct4 == 0x4)
-                snprintf(temp_instr_str, sizeof(temp_instr_str), "jr %s", regNames[rs2]);
-            else if (funct3 == 0x0 && funct4 == 0x8)
+            else if (funct3 == 0x0 && funct4 == 0xB)
+                snprintf(temp_instr_str, sizeof(temp_instr_str), "jr %s", regNames[rd_rs1]);
+            else if (funct3 == 0x0 && funct4 == 0xC)
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "jalr %s, %s", regNames[rd_rs1], regNames[rs2]);
             else
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "Unknown R-Type Instruction");
@@ -336,9 +336,9 @@ int z16sim::executeInstruction(uint16_t inst) {
                 regs[rd_rs1] = ((int16_t)regs[rd_rs1] < (int16_t)regs[rs2]) ? 1 :0;
             else if(funct3 == 0x2)    // sltu (unsigned less than)
                 regs[rd_rs1] = (regs[rd_rs1] < regs[rs2]) ? 1: 0;
-            else if (funct3 == 0x3 && funct4 == 0x2)    // sll (shift left logical)
+            else if (funct3 == 0x3 && funct4 == 0x4)    // sll (shift left logical)
                 regs[rd_rs1] = regs[rd_rs1] << (regs[rs2] & 0xF); // Use lower 4 bits for shift amount (max 15)
-            else if (funct3 == 0x3 && funct4 == 0x4)    // srl (shift right logical)
+            else if (funct3 == 0x3 && funct4 == 0x5)    // srl (shift right logical)
                 regs[rd_rs1] = regs[rd_rs1] >> (regs[rs2] & 0xF);
             else if (funct3 == 0x3 && funct4 == 0x8)    // sra (shift right arithmetic)
                 regs[rd_rs1] = (uint16_t)(((int16_t)regs[rd_rs1]) >> (regs[rs2] & 0xF));
@@ -350,15 +350,17 @@ int z16sim::executeInstruction(uint16_t inst) {
                 regs[rd_rs1] = (regs[rd_rs1] ^ regs[rs2]);
             else if (funct3 == 0x7)    // mv (move, alias for add x_dest, x_src, x0)
                 regs[rd_rs1] = regs[rs2];
-            else if (funct3 == 0x0 && funct4 == 0x4) {    // jr (jump register)
+            else if (funct3 == 0x0 && funct4 == 0xB) {    // jr (jump register)
                 pc = regs[rd_rs1];
                 pcUpdated = true;
             }
-            else if (funct3 == 0x0 && funct4 == 0x8) { // jalr (jump and link register)
+            else if (funct3 == 0x0 && funct4 == 0xC) { // jalr (jump and link register)
                 regs[rd_rs1] = pc + 2; // Store return address
                 pc = regs[rs2];       // Jump to target address in rs2
                 pcUpdated = true;
             }
+
+            std::cout << "R TYPE: funct3: " << static_cast<int>(funct3) << " funct4: " << static_cast<int>(funct4) << std::endl; 
             break;
         }
         case 0x1: { // I-type
@@ -445,7 +447,8 @@ int z16sim::executeInstruction(uint16_t inst) {
 
         if (branch_taken) {
             uint16_t old_pc = pc;
-            pc = pc + 2 + simm_offset; // Add 2 to move past current instruction, then add signed offset
+            // pc = pc + 2 simm_offset; // Add 2 to move past current instruction, then add signed offset           
+            pc = pc + simm_offset; // Add 2 to move past current instruction, then add signed offset
             pcUpdated = true;
 
             if (debug) {
@@ -481,7 +484,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                     memory[effective_address] = (uint8_t)(regs[rs2] & 0xFF);
                     std::cout << "effective address: " << effective_address << std::endl;
                     std::cout << "regs[rs2]: " << regs[rs2] << " rs2: " << rs2 << std::endl;
-                    if (effective_address >= 0x0000 && effective_address <= 0x093B) {
+                    if (effective_address >= 0x0000 && effective_address <= 0xFA0F) {
                         graphics.updateGraphicsMemory(effective_address + 1, regs[rs2] & 0xFF);
 
                     }
@@ -578,6 +581,27 @@ int z16sim::executeInstruction(uint16_t inst) {
                 regs[rd] = pc + (imm << 7); // Add PC-relative immediate
             break;
         }
+        // case 0x7: { // System instruction (ecall)
+        //     uint16_t svc = (inst >> 6) & 0x3FF; // (10-bit system-call number)
+        //     uint8_t func3 = (inst >> 3) & 0x7; // 000
+        //     if (func3 == 0x0) {
+        //         if (svc == 0x0) // Print character syscall
+        //             printf("%c", regs[6] & 0xFF); // a0 is in regs[6]
+        //         else if (svc == 0x1) // Read char into a0
+        //             regs[6] = getchar() & 0xFF;
+        //         else if (svc == 0x2) // Print string syscall
+        //             printf("%s", (char*)&memory[regs[6]]);
+        //         else if (svc == 0x3) // # Print decimal
+        //             printf("%d", (int16_t)regs[6]);
+        //         else if (svc == 0x3FF) // Exit program syscall
+        //             return 0;
+        //         else
+        //             printf("Unknown ecall: 0x%03X\n", svc);
+        //         break;
+        //     }
+        //     printf("Invalid system instruction: 0x%X\n", func3);
+        //     break;
+        // }
         case 0x7: { // System instruction (ecall)
             uint16_t svc = (inst >> 6) & 0x3FF; // (10-bit system-call number)
             uint8_t func3 = (inst >> 3) & 0x7; // 000
@@ -590,8 +614,36 @@ int z16sim::executeInstruction(uint16_t inst) {
                     printf("%s", (char*)&memory[regs[6]]);
                 else if (svc == 0x3) // # Print decimal
                     printf("%d", (int16_t)regs[6]);
+                else if (svc == 4) { // Play Tone
+                    std::cout << "[Tone] Freq: " << regs[6] << " Hz, Duration: " << regs[7] << " ms\n";
+                }
+                else if (svc == 5) { // Set Audio Volume
+                    std::cout << "[Audio] Set volume to " << regs[6] << "\n";
+                }
+                else if (svc == 6) { // Stop Audio Playback
+                    std::cout << "[Audio] Stop playback\n";
+                }
+                else if (svc == 7) { // Read Keyboard
+                    regs[6] = 0;
+                    regs[7] = 0;
+                    // For real implementation, poll input here
+                }
+                else if (svc == 8) { // Registers Dump
+                    dumpRegisters();
+                }
+                else if (svc == 9) { // Memory Dump
+                    uint16_t addr = regs[6];
+                    uint16_t len = regs[7];
+                    std::cout << "--- Memory Dump ---\n";
+                    for (uint16_t i = 0; i < len; ++i) {
+                        if (i % 16 == 0) std::cout << "\n0x" << std::hex << (addr + i) << ": ";
+                        std::cout << std::setw(2) << std::setfill('0') << std::hex << (int)memory[addr + i] << " ";
+                    }
+                    std::cout << std::dec << "\n-------------------\n";
+                }
                 else if (svc == 0x3FF) // Exit program syscall
                     return 0;
+
                 else
                     printf("Unknown ecall: 0x%03X\n", svc);
                 break;
@@ -599,6 +651,7 @@ int z16sim::executeInstruction(uint16_t inst) {
             printf("Invalid system instruction: 0x%X\n", func3);
             break;
         }
+
         default:
             std::cerr << "Unknown instruction opcode 0x" << std::hex << (int)opcode << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
             return 0;
@@ -681,13 +734,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    
-    simulator.graphics.updateGraphicsMemory(0x0000, 0x01); // Assign tile 1 to first screen cell
-
-    // Fill tile 1 with visible pattern
-    for (int i = 0; i < 128; ++i) {
-        simulator.graphics.updateGraphicsMemory(0x012C + i, 0xFF); // solid white tile
-    }
 
     // --- 3. Handle Simulation Modes ---
     if (!interactive_mode) {
