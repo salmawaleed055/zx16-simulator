@@ -14,10 +14,10 @@
 .equ DOWN, 2
 
 # PADDLES
-.equ PADDLE_LENGTH, 5
+.equ PADDLE_LENGTH, 2
 .equ TOP, 0 # max top where paddle can go up
 .equ BOTTOM, 9  # (SCREEN_HEIGHT - PADDLE_LENGTH - 1)  max bottom where paddle can go down
-.equ LEFT_X, 13
+.equ LEFT_X, 5
 .equ RIGHT_X, 18
 
 # BALL
@@ -27,6 +27,10 @@
 .equ BALL_RIGHT, 1
 .equ BALL_UP, -1
 .equ BALL_DOWN, 1
+
+# TILE INDICES
+.equ PADDLE_TILE, 1
+.equ BALL_TILE, 2
 
 .equ GAME_WIN, 10 # win when reach 10 points
 
@@ -51,137 +55,157 @@ ball_dy_wait:  .word 1# vertical speed counter
 
 # -- entry point for program ---
 main:
-    li s0, TILE_MAP_BASE
-    j start
+    # Initialize stack pointer
+
 # ----------------------------------------------
 
-
-
-# --- start the game ---
-start:
-    # set the y positions of paddles
-    li t0, 3
-    la t1, p1_paddle_y
-    sw t0, 0(t1)
-
-    la t1, p2_paddle_y
-    sw t0, 0(t1)
-
-
-    # set the position of ball
-    li t0, BALL_START_X
-    la t1, ball_x
-    sw t0, 0(t1)
-
-    li t0, BALL_START_Y
-    la t1, ball_y
-    sw t0, 0(t1)
-
-    li t0, BALL_RIGHT
-    la t1, ball_dx
-    sw t0, 0(t1)
-
-    li t0, BALL_DOWN
-    la t1, ball_dy
-    sw t0, 0(t1)
-
-    li t0, 1
-    la t1, ball_dy_wait
-    sw t0, 0(t1)
-
-
-    # load blue into palette
-    lui s0, 18 # s0 = 0x092C
+setup_graphics:
+    lui s0, 18 # load palette base address
     ori s0, 0x2C
-    li s1, 0x03 # blue
-    sb s1, 4(s0) # palette[4] = 0x03
 
-    # fill tile 0 with blue pixels (0x11)
-    lui s0, 2 # s0 = 0x012C
-    ori s0, 0x2C
-    li s1, 0x44       
-    li t1, 128 # tile size
-    li t0, 0
+    li t1, 0x03 # load blue
+    sb t1, 4(s0)
+
+    li t1, 0xFF # load white
+    sb t1, 7(s0)
+
+    # fill tile 1 (paddle) with blue 
+    lui t0, 2  # load tile data base address
+    ori t0, 0x2C
+    addi t0, 63 # Offset to tile 1 (128 bytes per tile)
+    addi t0, 63 
+    addi t0, 2
+
+    # li t1, 0x44
+    li t1, 0     # t1 = 0
+    addi t1, 63  # t1 = 63
+    addi t1, 5   # t1 = 68 (0x44)
+
+    li s0, 128
 
     addi x0, 0
-    addi x0, 0
-    addi x0, 0
-    addi x0, 0
-    addi x0, 0
-    addi x0, 0
+    fill_paddle:
+        sb t1, 0(t0)
+        addi t0, 1
+        addi s0, -1
+        bnz s0, fill_paddle
 
-    # fill_tile:
-        # bge t0, t1, fill_done
-        # sb s1, 0(s0)
-        # addi s0, 1
-        # addi t0, 1
-        # j fill_tile
-
-    #fill_done:
+    draw_paddle:
         # draw left paddle
         li a0, LEFT_X
         la t0, p1_paddle_y
         lw a1, 0(t0)
-        li s1, 0
+        li t0, PADDLE_TILE
+        addi sp, -2
+        sw t0, 0(sp)
 
-        draw_paddle_1:
-            li t0, 20
+        lw s1, 0(sp) # tile index
+        li s0, PADDLE_LENGTH
+
+        draw_paddle_loop:
+            addi x0, 0
+            # li t0, 20
             # Compute a1 * 20 using shifts
             sll t0, a1, 4       # t0 = y << 4 = y * 16
             sll t1, a1, 2       # t1 = y << 2 = y * 4
             add t0, t1      # t0 = y*16 + y*4 = y * 20
             add t0, a0      # t0 += x
-            add t0, s1
-            li s0, TILE_MAP_BASE
-            add t0, s0 
-            li t1, 0 # tile index 0
+            li t1, TILE_MAP_BASE
+            add t0, t0
+            sb s1, 0(t1)
+
+            addi a1, 1
+            addi s0, -1
+            li  ra, 0
+            # bne s0, ra, draw_paddle_loop
+            beq s0, ra, draw_ball
+            j draw_paddle_loop
+
+    draw_ball:
+        # fill tile 2 (ball) with white
+        addi x0, 0
+        addi x0, 0
+        addi x0, 0
+        lui t0, 2
+        ori t0, 0x2C
+        addi t0, 128
+        addi t0, 128
+        # li t1, 0xFF
+        li t1, 0     # t1 = 0
+        addi t1, 63  # t1 = 63
+        addi t1, 5   # t1 = 68 (0x44)
+        li s0, 128
+
+        addi x0, 0      
+        fill_ball:
+            addi x0, 0 
+            addi x0, 0 
+            addi x0, 0 
             sb t1, 0(t0)
-            addi s1, 1
-            li a1, PADDLE_LENGTH
-            bne s1, a1, draw_paddle_1
+            addi t0, 1
+            addi s0, -1
+
+            li ra, 0
+            beq s0, ra, next
+            j fill_ball
+
+        next: 
+            add x0, 0
+            add x0, 0
+            la t0, ball_x
+            lw a0, 0(t0)
+            la t0, ball_y
+            lw a1, 0(t0)
+
+            sll t0, a1, 4
+            sll t1, a1, 2
+            add t0, t1
+            add t0, a0
+            add t0, t0
+
+            li t1, TILE_MAP_BASE
+            add t0, t1
+
+            li t1, BALL_TILE
+            sb t1, 0(t0)
 
 
-        # draw right paddle
-        li a0, RIGHT_X
-        la t0, p2_paddle_y
-        lw a1, 0(t0)
-        li s1, 0
+            ecall 0x3FF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# # --- start the game ---
+# start:
     
-        draw_paddle_2:
-            li t0, 20
-            # Compute a1 * 20 using shifts
-            sll t0, a1, 4       # t0 = y << 4 = y * 16
-            sll t1, a1, 2       # t1 = y << 2 = y * 4
-            add t0, t1      # t0 = y*16 + y*4 = y * 20
-            add t0, a0      # t0 += x
-            add t0, s1
-            li s0, TILE_MAP_BASE
-            add t0, s0 
-            li t1, 0 # tile index 0
-            sb t1, 0(t0)
-            addi s1, 1
-            li a1, PADDLE_LENGTH
-            bne s1, a1, draw_paddle_2
-            ecall 0x3FF
 
+# # --- clears board to prepare for new game ---
+# clear_game:
+#     li t0, TILE_MAP_BASE 
+#     li t1, BLANK_TILE
+#     lui s1, 2
+#     ori s1, 44 # load 300 into s1
 
-# --- clears board to prepare for new game ---
-clear_game:
-    li t0, TILE_MAP_BASE 
-    li t1, BLANK_TILE
-    lui s1, 2
-    ori s1, 44 # load 300 into s1
-
-    clear_loop:
-        addi x0, 0
-        addi x0, 0
-        sb t1, 0(t0) # store blank tile at t[0]
-        addi t0, 1 # t0++
-        addi s1, -1 # t2--
-        bge t1, s1, cleared
-        j clear_loop
-        cleared:
-            addi x0, 0
-            addi x0, 0
-            ecall 0x3FF
-# ----------------------------------------------
+#     clear_loop:
+#         addi x0, 0
+#         addi x0, 0
+#         sb t1, 0(t0) # store blank tile at t[0]
+#         addi t0, 1 # t0++
+#         addi s1, -1 # t2--
+#         bge t1, s1, cleared
+#         j clear_loop
+#         cleared:
+#             addi x0, 0
+#             addi x0, 0
+#             ecall 0x3FF
+# # ----------------------------------------------

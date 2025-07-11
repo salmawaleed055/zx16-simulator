@@ -13,7 +13,12 @@ main:
     lui t1, 2  # load tile data base address
     ori t1, 0x2C
 
-    li s1, 0x44 # tile 0
+    # li s1, 0x44 # tile 0
+    li s1, 0     # s1 = 0
+    addi s1, 63  # s1 = 63
+    addi s1, 5   # s1 = 68 (0x44)
+
+
     li s0, 63
     addi s0, 63
     addi s0, 1
