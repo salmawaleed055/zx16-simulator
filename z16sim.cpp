@@ -5,6 +5,39 @@
 #include <stdexcept> 
 #include <cstdio>    
 #include <cstring>
+#include <SFML/Audio.hpp>
+#include <thread>   // For std::this_thread
+#include <chrono>   // For std::chrono
+#include <vector>
+#include <cmath>
+#include <conio.h>
+
+// At the top of your file or in your class
+sf::Music music;
+
+void playTone(float frequency, int durationMs) {
+    const int sampleRate = 44100;
+    int sampleCount = sampleRate * durationMs / 1000;
+    std::vector<sf::Int16> samples(sampleCount);
+
+    for (int i = 0; i < sampleCount; ++i) {
+        samples[i] = 30000 * std::sin(2 * 3.14159265f * frequency * i / sampleRate);
+    }
+
+    sf::SoundBuffer buffer;
+    if (!buffer.loadFromSamples(samples.data(), sampleCount, 1, sampleRate)) {
+        std::cerr << "Failed to load sound buffer" << std::endl;
+        return;
+    }
+
+    sf::Sound sound(buffer);
+    sound.play();
+
+    while (sound.getStatus() == sf::Sound::Playing) {
+        sf::sleep(sf::milliseconds(10));
+    }
+}
+
 
 // Initialize static member (outside class definition)
 const char* z16sim::regNames[z16sim::NUM_REGS] = {"t0", "ra", "sp", "s0", "s1", "t1", "a0", "a1"};
@@ -614,24 +647,54 @@ int z16sim::executeInstruction(uint16_t inst) {
                     printf("%s", (char*)&memory[regs[6]]);
                 else if (svc == 0x3) // # Print decimal
                     printf("%d", (int16_t)regs[6]);
-                else if (svc == 4) { // Play Tone
-                    std::cout << "[Tone] Freq: " << regs[6] << " Hz, Duration: " << regs[7] << " ms\n";
+                else if (svc == 0x4) { // Play Tone
+                    uint16_t freq = regs[6];      // a0
+                    uint16_t duration = regs[7];  // a1
+
+                    // Defensive checks
+                    if (freq < 20 || freq > 20000) { // Human hearing range
+                        std::cout << "Invalid frequency: " << freq << " Hz (must be 20-20000)\n";
+                        break;
+                    }
+                    if (duration == 0 || duration > 5000) { // 0 < duration <= 5 seconds
+                        std::cout << "Invalid duration: " << duration << " ms (must be 1-5000)\n";
+                        break;
+                    }
+                     playTone(static_cast<float>(regs[6]), static_cast<int>(regs[7]));
+
+                    break;
                 }
-                else if (svc == 5) { // Set Audio Volume
-                    std::cout << "[Audio] Set volume to " << regs[6] << "\n";
+
+
+                else if (svc == 0x5) { // Set Audio Volume
+                    uint8_t volume = regs[6] & 0xFF; // a0
+                    float sfmlVolume = (volume / 255.0f) * 100.0f;
+                    std::cout << "[Audio] Set volume to " << (int)volume << " (SFML: " << sfmlVolume << ")\n";
+                    music.setVolume(10); // music must be a persistent sf::Music or sf::Sound object
                 }
-                else if (svc == 6) { // Stop Audio Playback
+                else if (svc == 0x6) { // Stop Audio Playback
                     std::cout << "[Audio] Stop playback\n";
                 }
-                else if (svc == 7) { // Read Keyboard
+                else if (svc == 0x7) { // Read Keyboard
+#ifdef _WIN32
+                    if (_kbhit()) {
+                        int ch = _getch();
+                        regs[6] = ch; // a0 = key code
+                        regs[7] = 1;  // a1 = key pressed
+                    } else {
+                        regs[6] = 0;
+                        regs[7] = 0;
+                    }
+#else
+                    // Fallback for non-Windows (see below)
                     regs[6] = 0;
                     regs[7] = 0;
-                    // For real implementation, poll input here
+#endif
                 }
-                else if (svc == 8) { // Registers Dump
+                else if (svc == 0x8) { // Registers Dump
                     dumpRegisters();
                 }
-                else if (svc == 9) { // Memory Dump
+                else if (svc == 0x9) { // Memory Dump
                     uint16_t addr = regs[6];
                     uint16_t len = regs[7];
                     std::cout << "--- Memory Dump ---\n";
@@ -765,7 +828,7 @@ int main(int argc, char **argv) {
                             simulator.graphics.window.clear();
                             simulator.graphics.window.draw(simulator.graphics.screenSprite);
                             simulator.graphics.window.display();
-                            // sf::sleep(sf::milliseconds(100));
+                            sf::sleep(sf::milliseconds(100));
                         }
                     }
 
