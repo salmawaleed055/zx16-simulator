@@ -37,36 +37,35 @@ void Graphics::updateGraphicsMemory(uint16_t addr, uint8_t value) {
         std::cout << "haallloooooo" << std::endl;
         initGraphics();
     }
-        // if (addr >= 0xF000 && addr <= 0xF12B) {
-        if (addr >= 0x0000 && addr <= 0x012B) {
+        if (addr >= 0xF000 && addr <= 0xF12B) {
+        // if (addr >= 0x0000 && addr <= 0x012B) {
         // Tile map update
-        // tileMap[addr - 0xF000] = value;
+        tileMap[addr - 0xF000] = value;
         std::cout << "tile map updateee" << std::endl;
-        // tileMap[addr] = value;
-        tileMap[addr - 0x0000] = value; 
+        // tileMap[addr - 0x0000] = value; 
         screenNeedsUpdate = true;
     }
 
 
-    // else if (addr >= 0xF200 && addr <= 0xF9FF) {
-    else if (addr >= 0x012C && addr <= 0x092B) {
+    else if (addr >= 0xF200 && addr <= 0xF9FF) {
+    // else if (addr >= 0x012C && addr <= 0x092B) {
         // Tile data update
         std::cout << "tile data updateee" << std::endl;
-        // int tileIndex = (addr - 0xF200) / 128;
-        // int byteOffset = (addr - 0xF200) % 128;
-        int tileIndex = (addr - 0x012C) / 128;
-        int byteOffset = (addr - 0x012C) % 128;
+        int tileIndex = (addr - 0xF200) / 128;
+        int byteOffset = (addr - 0xF200) % 128;
+        // int tileIndex = (addr - 0x012C) / 128;
+        // int byteOffset = (addr - 0x012C) % 128;
         if (tileIndex < 16) {
             tileData[tileIndex][byteOffset] = value;
             screenNeedsUpdate = true;
         }
     }
-    // else if (addr >= 0xFA00 && addr <= 0xFA0F) {
-    else if (addr >= 0x092C && addr <= 0x093B) {
+    else if (addr >= 0xFA00 && addr <= 0xFA0F) {
+    // else if (addr >= 0x092C && addr <= 0x093B) {
         // Color palette update
         std::cout << "color palette updateee" << std::endl;
-        // colorPalette[addr - 0xFA00] = value;
-        colorPalette[addr - 0x092C] = value;
+        colorPalette[addr - 0xFA00] = value;
+        // colorPalette[addr - 0x092C] = value;
         screenNeedsUpdate = true;
     }
 

@@ -475,7 +475,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                 return 0;
             }
 
-            if (effective_address >= 0x0000 && effective_address <= 0x093B) {
+            if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
                 graphics.updateGraphicsMemory(effective_address, regs[rs2] & 0xFF);
             }
 
@@ -484,7 +484,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                     memory[effective_address] = (uint8_t)(regs[rs2] & 0xFF);
                     std::cout << "effective address: " << effective_address << std::endl;
                     std::cout << "regs[rs2]: " << regs[rs2] << " rs2: " << rs2 << std::endl;
-                    if (effective_address >= 0x0000 && effective_address <= 0x093B) {
+                    if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
                         graphics.updateGraphicsMemory(effective_address + 1, regs[rs2] & 0xFF);
 
                     }
