@@ -9,6 +9,11 @@ add_executable(z16sim
     graphics.cpp
 )
 
-target_link_libraries(z16sim PRIVATE sfml-graphics sfml-window sfml-system)
+target_link_libraries(z16sim PRIVATE 
+    sfml-graphics 
+    sfml-window 
+    sfml-system 
+    sfml-audio
+)
 
 target_compile_options(z16sim PRIVATE -Wall -Wextra -pedantic)
