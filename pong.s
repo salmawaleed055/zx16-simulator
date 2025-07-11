@@ -1,7 +1,7 @@
 # ------ CONSTANTS ------
-.equ TILE_MAP_BASE, 0x0000
-.equ PALETTE_BASE, 0x092C
-.equ TILE_DATA_BASE, 0x012C
+.equ TILE_MAP_BASE, 0xF000
+.equ PALETTE_BASE, 0xFA00
+.equ TILE_DATA_BASE, 0xF200
 .equ SCREEN_WIDTH, 20
 .equ SCREEN_HEIGHT, 15
 
@@ -11,13 +11,13 @@
 .equ BALL_TILE, 2
 
 # Game constants
-.equ PADDLE_LENGTH, 5
+.equ PADDLE_LENGTH, 3
 .equ PADDLE_SPEED, 1
 .equ BALL_SPEED, 1
-.equ LEFT_PADDLE_X, 7
-.equ RIGHT_PADDLE_X, 18
+.equ LEFT_PADDLE_X, 1
+.equ RIGHT_PADDLE_X, 13
 .equ PADDLE_MIN_Y, 1
-.equ PADDLE_MAX_Y, 12
+.equ PADDLE_MAX_Y, 13
 
 # Key codes
 .equ KEY_W, 119
@@ -27,14 +27,24 @@
 # ------------------------
 
 
+# ------ Game state addresses ------
+.equ P1_Y_ADDR, 0xF12C
+.equ P2_Y_ADDR, 0xF12E
+.equ BALL_X_ADDR, 0xF130
+.equ BALL_Y_ADDR, 0xF132
+.equ BALL_DX_ADDR, 0xF134
+.equ BALL_DY_ADDR, 0xF136
+# ------------------------
+
+
 # ------ GAME STATE ------
 .data
-p1_y: .word 10  # Player 1 paddle Y position
+p1_y: .word 7  # Player 1 paddle Y position
 p2_y: .word 7   # Player 2 paddle Y position
-ball_x: .word 7
-ball_y: .word 1
+ball_x: .word 10
+ball_y: .word 7
 ball_dx: .word 1
-ball_dy: .word 1
+ball_dy: .word -1
 # --------------------------
 
 
@@ -79,7 +89,7 @@ init_graphics:
     
     # ball tile (white)
     li t0, TILE_DATA_BASE
-    addi t0, 63
+    addi t0, 63 # 256
     addi t0, 63
     addi t0, 2
     addi t0, 63
@@ -87,7 +97,7 @@ init_graphics:
     addi t0, 2
 
     li t1, 0x22
-    addi s0, 63
+    addi s0, 63 # 128
     addi s0, 63
     addi s0, 2
 
@@ -102,43 +112,93 @@ init_graphics:
         # player 1
         li a0, LEFT_PADDLE_X  # 1
         lw a1, 0(p1_y) # word 7
+        li s1, PADDLE_TILE
+        li t0, TILE_MAP_BASE
 
-        draw_paddle:
-            li t0, TILE_MAP_BASE
-            li t1, SCREEN_WIDTH # 20
-            li t1, 140
+        mv s0, a1
+        slli s0, 4
 
-            add t1, a0
-            add t0, t1
+        mv t1, a1
+        slli t1, 2
 
-            li s0, PADDLE_LENGTH
-            li s1, PADDLE_TILE
+        add t1, s0
+        add t1, a0
+        add t1, t0
 
-            draw_paddle_loop:
-                sb s1, 0(t0)
-                addi t0, SCREEN_WIDTH
-                addi s1, -1
-                bnz s1, draw_paddle_loop
-                
+        li s0, PADDLE_LENGTH
+        add x0, 0
+        draw_paddle1_loop:
+            sb s1, 0(t1)
+            addi t1, 1
+            addi a1, 1
+            addi s0, -1
+            bnz s0, draw_paddle1_loop
+
+        # player 2
+        li t0, 0
+        li t1, 0
+        li s0, 0
+        li s1, 0
+        li a0, 0
+        li a1, 0
+
+        li a0, RIGHT_PADDLE_X 
+        lw a1, 0(p2_y) 
+        li s0, PADDLE_LENGTH
+        li s1, PADDLE_TILE
+        li t0, TILE_MAP_BASE
+
+        mv s0, a1
+        slli s0, 4
+
+        mv t1, a1
+        slli t1, 2
+
+        add t1, s0
+        add t1, a0
+        add t1, t0
+
+
+        li s0, SCREEN_WIDTH # 20
+        add x0, 0
+        draw_paddle2_loop:
+            sb s1, 0(t1)
+            addi t1, 1
+            addi a1, 1
+            addi s0, -1
+            bnz s0, draw_paddle2_loop
+
 
     draw_ball:
+        li t0, 0
+        li t1, 0
+        li s0, 0
+        li s1, 0
+        li a0, 0
+        li a1, 0
+
         la t0, ball_x
         lw a0, 0(t0)
         la t0, ball_y
         lw a1, 0(t0)
 
         li t0, 20
-        sll t1, a1, 4
-        sll s0, a1, 2
-        add t1, s0
 
+        mv t1, a1
+        slli t1, 4
+
+        mv s0, a1
+        slli s0, 2
+
+        add t1, s0
         add t1, a0
+
         li t0, TILE_MAP_BASE
         add t1, t0 
 
-        li t0, BALL_TILE
-        sb t0, 0(t1)
-
+        li s1, BALL_TILE
+        sb s1, 0(t1)
+        
         ecall 0x3FF
 
 

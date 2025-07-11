@@ -88,7 +88,7 @@ sf::Color Graphics::paletteToColor(uint8_t colorIndex) {
 }
 
 
-void Graphics::renderTile(int tileIndex, int screenX, int screenY) {
+void Graphics::renderTile(int tileIndex, int screenY, int screenX) {
     if (tileIndex >= 16) return;
     
     for (int y = 0; y < 16; y++) {
