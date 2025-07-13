@@ -11,7 +11,6 @@ add_executable(zx16_simulator
 add_executable(Create_Test_bins
 
         z16sim.cpp
-        create_test_bins.cpp
         z16sim.cpp
 )
 add_executable(zx16_simulator_tests
@@ -19,7 +18,6 @@ add_executable(zx16_simulator_tests
         z16sim.cpp
 )
 add_executable(zx16_simulator_tests_2
-        Test_driver.cpp
         z16sim.cpp
 )
 

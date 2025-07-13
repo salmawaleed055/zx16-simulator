@@ -7,7 +7,7 @@
 
 // Initialize static member (outside class definition)
 const char* z16sim::regNames[z16sim::NUM_REGS] = {"t0", "ra", "sp", "s0", "s1", "t1", "a0", "a1"};
-
+float globalVolume = 50.0f;
 
 // Constructor
 z16sim::z16sim() : pc(0), debug(false) {
@@ -588,38 +588,179 @@ case 0x2: { // B-type (Branch)
                 break;
     }
         case 0x7: { // System instruction (ecall)
-            uint8_t funct3  = (inst >> 3) & 0x7;
-            uint8_t Service  = (inst >> 6) & 0x7; // Service number (from bits 8:6)
-            if(funct3 == 0x0) {
-                switch (Service) {
-                    case 0x1: { // print_int (a0)
-                        int16_t number = regs[6]; // Assuming a0 (x6) holds the integer
-                        std::cout << number << "\n";
-                        break;
-                    }
-                    case 0x5: { // print_string (a0)
-                        uint16_t string_addr = regs[6]; // Assuming a0 (x6) holds the address
-                        if (string_addr < MEM_SIZE) {
-                            std::cout << (char*)&memory[string_addr] << "\n";
-                        } else {
-                            std::cerr << "Error: Attempted to print string from out-of-bounds address 0x" << std::hex << string_addr << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
-                            return 0; // Terminate simulation on error
-                        }
-                        break;
-                    }
-                    case 0x3: { // exit
-                        return 0; // Signal to halt simulation from within the class
-                    }
-                    default:
-                        std::cerr << "Unknown ecall service: " << (int)Service << " at PC 0x" << std::hex << pc << std::dec << "\n";
-                        return 0; // Terminate on unknown ecall service
+    uint8_t funct3 = (inst >> 3) & 0x7;
+    uint16_t Service = (inst >> 6) & 0x3FF; // Extract 10 bits for service number (bits 15:6)
+
+    if(funct3 == 0x0) {
+        switch (Service) {
+            case 0x1: { // Read String
+                uint16_t buffer_addr = regs[6]; // a0 = address of string buffer
+                uint16_t max_length = regs[7];  // a1 = maximum length
+
+                if (buffer_addr >= MEM_SIZE) {
+                    std::cerr << "Error: String buffer address out of bounds at PC 0x"
+                              << std::hex << pc << std::dec << "\n";
+                    return 0;
                 }
-            } else {
-                std::cerr << "Unknown system funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
-                return 0; // Terminate on unknown system instruction
+
+                std::string input;
+                std::getline(std::cin, input);
+
+                // Truncate if necessary
+                if (input.length() > max_length - 1) {
+                    input = input.substr(0, max_length - 1);
+                }
+
+                // Copy string to memory
+                for (size_t i = 0; i < input.length(); i++) {
+                    if (buffer_addr + i < MEM_SIZE) {
+                        memory[buffer_addr + i] = input[i];
+                    }
+                }
+                memory[buffer_addr + input.length()] = '\0'; // Null terminator
+
+                regs[6] = input.length(); // Return string length in a0
+                break;
             }
-            break;
+
+            case 0x2: { // Read Integer
+                int16_t number;
+                std::cin >> number;
+                regs[6] = number; // Return integer in a0
+                break;
+            }
+
+            case 0x3: { // Print String
+                uint16_t string_addr = regs[6]; // a0 = address of string
+                if (string_addr < MEM_SIZE) {
+                    std::cout << (char*)&memory[string_addr];
+                } else {
+                    std::cerr << "Error: Attempted to print string from out-of-bounds address 0x"
+                              << std::hex << string_addr << std::dec << " at PC 0x"
+                              << std::hex << pc << std::dec << "\n";
+                    return 0;
+                }
+                break;
+            }
+
+        case 0x4: { // Play tone
+                    uint16_t frequency = regs[6];
+                    uint16_t duration_ms = regs[7];
+
+                    // Validate inputs
+                    if (frequency < 20 || frequency > 20000) {
+                        std::cout << "Invalid frequency: " << frequency << " Hz\n";
+                        break;
+                    }
+
+                    float duration_sec = duration_ms / 1000.0f;
+                    float volume = globalVolume / 100.0f; // Assuming globalVolume is 0-100
+
+                    std::string cmd = "play -n synth " + std::to_string(duration_sec) +
+                                     " sine " + std::to_string(frequency) +
+                                     " vol " + std::to_string(volume) + " > /dev/null 2>&1";
+
+                    std::cout << "Playing tone: " << frequency << "Hz for " << duration_ms << "ms\n";
+                    system(cmd.c_str());
+                    break;
         }
+
+        case 0x5: { // Set audio volume
+                    uint16_t volume = regs[6];
+                    if (volume > 255) volume = 255;
+
+                    globalVolume = (volume / 255.0f) * 100.0f;
+                    std::cout << "Audio volume set to: " << volume << "/255\n";
+                    break;
+        }
+
+        case 0x6: { // Stop Audio playback
+                    std::cout << "Audio playback stopped\n";
+                    // Kill any running play processes
+                    system("pkill -f 'play -n synth' > /dev/null 2>&1");
+                    break;
+        }
+
+
+            case 0x7: { // Read the keyboard
+
+
+                char key = 0;
+                bool key_available = false;
+
+                // Check if input is available (simplified)
+                if (std::cin.peek() != EOF) {
+                    std::cin >> key;
+                    key_available = true;
+                }
+
+                regs[6] = key_available ? key : 0;    // a0 = key code
+                regs[7] = key_available ? 1 : 0;      // a1 = 1 if key pressed, 0 otherwise
+                break;
+            }
+
+            case 0x8: { // Registers Dump
+                std::cout << "=== Register Dump ===\n";
+                for (int i = 0; i < 8; i++) { // ZX16 has 8 registers (x0-x7)
+                    std::cout << "x" << i << ": 0x" << std::hex << std::setfill('0')
+                              << std::setw(4) << regs[i] << " (" << std::dec << regs[i] << ")\n";
+                }
+                std::cout << "PC: 0x" << std::hex << std::setfill('0')
+                          << std::setw(4) << pc << std::dec << "\n";
+                std::cout << "==================\n";
+                break;
+            }
+
+            case 0x9: { // Memory Dump
+                uint16_t start_addr = regs[6]; // a0 = start address
+                uint16_t num_bytes = regs[7];  // a1 = number of bytes
+
+                if (start_addr >= MEM_SIZE || start_addr + num_bytes > MEM_SIZE) {
+                    std::cerr << "Error: Memory dump range out of bounds at PC 0x"
+                              << std::hex << pc << std::dec << "\n";
+                    return 0;
+                }
+
+                std::cout << "=== Memory Dump ===\n";
+                std::cout << "Address: 0x" << std::hex << std::setfill('0')
+                          << std::setw(4) << start_addr << " - 0x"
+                          << std::setw(4) << (start_addr + num_bytes - 1) << std::dec << "\n";
+
+                for (uint16_t i = 0; i < num_bytes; i++) {
+                    if (i % 16 == 0) {
+                        std::cout << std::hex << std::setfill('0') << std::setw(4)
+                                  << (start_addr + i) << ": ";
+                    }
+
+                    std::cout << std::hex << std::setfill('0') << std::setw(2)
+                              << (int)memory[start_addr + i] << " ";
+
+                    if ((i + 1) % 16 == 0 || i == num_bytes - 1) {
+                        std::cout << "\n";
+                    }
+                }
+                std::cout << std::dec << "=================\n";
+                break;
+            }
+
+            case 0xa: { // Program Exit (service 10)
+                std::cout << "Program terminated via ecall\n";
+                return 0;
+            }
+
+            default:
+                std::cerr << "Unknown ecall service: " << (int)Service
+                          << " at PC 0x" << std::hex << pc << std::dec << "\n";
+                return 0;
+        }
+    } else {
+        std::cerr << "Unknown system funct3: 0x" << std::hex << (int)funct3
+                  << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
+        return 0;
+    }
+    break;
+}
+
         default:
             std::cerr << "Unknown instruction opcode 0x" << std::hex << (int)opcode << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
             return 0; // Terminate on unknown opcode
@@ -657,6 +798,8 @@ bool z16sim::cycle() {
 
     return true; // Continue to next cycle
 }
+
+
 
 int main(int argc, char **argv) {
     z16sim simulator; // Create an instance of your simulator
