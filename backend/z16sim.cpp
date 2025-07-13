@@ -1,8 +1,39 @@
-#include "z16sim.h" // Include your header file
-#include <iostream>  // For std::cout, std::cerr
-#include <iomanip>   // For std::hex, std::setw, std::setfill
-#include <stdexcept> // For std::runtime_error
-#include <cstdio>    // For snprintf, fopen, fread, ferror, fclose
+#include "z16sim.h"
+#include "graphics.h"
+#include <iostream>
+#include <iomanip>
+#include <stdexcept>
+#include <cstdio>
+#include <cstring>
+#include <thread>   // For std::this_thread
+#include <chrono>   // For std::chrono
+#include <SFML/Audio.hpp>
+#include <cmath>
+
+sf::Music music;
+
+void playTone(float frequency, int durationMs) {
+    const int sampleRate = 44100;
+    int sampleCount = sampleRate * durationMs / 1000;
+    std::vector<sf::Int16> samples(sampleCount);
+
+    for (int i = 0; i < sampleCount; ++i) {
+        samples[i] = 30000 * std::sin(2 * 3.14159265f * frequency * i / sampleRate);
+    }
+
+    sf::SoundBuffer buffer;
+    if (!buffer.loadFromSamples(samples.data(), sampleCount, 1, sampleRate)) {
+        std::cerr << "Failed to load sound buffer" << std::endl;
+        return;
+    }
+
+    sf::Sound sound(buffer);
+    sound.play();
+
+    while (sound.getStatus() == sf::Sound::Playing) {
+        sf::sleep(sf::milliseconds(10));
+    }
+}
 
 // Initialize static member (outside class definition)
 const char* z16sim::regNames[z16sim::NUM_REGS] = {"t0", "ra", "sp", "s0", "s1", "t1", "a0", "a1"};
@@ -10,25 +41,29 @@ const char* z16sim::regNames[z16sim::NUM_REGS] = {"t0", "ra", "sp", "s0", "s1", 
 
 // Constructor
 z16sim::z16sim() : pc(0), debug(false) {
-    std::memset(regs, 0, sizeof(regs));
-    std::memset(memory, 0, sizeof(memory));
-    // Initialize infinityCheck if it's a member array
-    // If you want to use it, uncomment it and consider it's reset in reset()
-    // std::fill(std::begin(infinityCheck), std::end(infinityCheck), 0);
-    //
-    // For now, I'll comment out the interactive loop detection.
-    // If you want it, it's better handled at the calling (main) level,
-    // where it can decide if it wants to prompt the user or auto-terminate.
+    memset(regs, 0, sizeof(regs));
+    memset(memory, 0, sizeof(memory));
+
+
+    // Initialize graphics memory
+    memset(graphics.tileMap, 0, sizeof(graphics.tileMap));
+    memset(graphics.tileData, 0, sizeof(graphics.tileData));
+    memset(graphics.colorPalette, 0, sizeof(graphics.colorPalette));
+    memset(graphics.frameBuffer, 0, sizeof(graphics.frameBuffer));
+    graphics.screenNeedsUpdate = true;
+    graphics.graphicsInitialized = false;
+    graphics.graphicsMemoryAccessed = false;
 }
+
+
 
 // Resets the simulator state
 void z16sim::reset() {
-    std::memset(regs, 0, sizeof(regs));
-    std::memset(memory, 0, sizeof(memory));
+    memset(regs, 0, sizeof(regs));
+    memset(memory, 0, sizeof(memory));
     pc = 0;
-    debug = false; // Reset debug status too
-    // Reset infinityCheck counts
-    //std::fill(std::begin(infinityCheck), std::end(infinityCheck), 0);
+    debug = false;
+
 }
 
 // Set debug mode
@@ -36,23 +71,9 @@ void z16sim::setDebug(bool d) {
     debug = d;
 }
 
-// Set verbose mode (for messages like "Loaded X bytes")
-void z16sim::setVerbose(bool val) {
-    // Assuming you add a 'verbose' member to your class, e.g., bool verbose;
-    // this->verbose = val;
-    // If you don't have it, just remove this function or add the member.
-    // For this example, I will assume `verbose` member exists.
-}
 
-// Optional getter for debug status
 bool z16sim::isDebug() const {
     return debug;
-}
-
-// Optional getter for verbose status (assuming it exists)
-bool z16sim::isVerbose() const {
-    // return verbose;
-    return false; // Placeholder if you haven't added 'verbose' member
 }
 
 
@@ -66,6 +87,7 @@ void z16sim::dumpRegisters() const {
     }
     std::cout << "-----------------\n";
 }
+
 
 // Loads machine code from a .bin file into memory. No user prompts.
 void z16sim::loadMemoryFromFile(const char* filename) {
@@ -81,14 +103,8 @@ void z16sim::loadMemoryFromFile(const char* filename) {
     }
     std::fclose(file);
 
-    // If verbose mode is implemented and enabled, then print:
-    // if (verbose) { // Assuming 'verbose' is a member variable
-    //     std::cout << "Loaded " << bytesRead << " bytes into memory\n";
-    // }
 }
 
-// Disassembly function (moved into class, signature matches header)
-// Fixed pseudo-instruction implementations for z16sim disassemble function
 
 void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t bufSize) {
     uint8_t opcode = inst & 0x7;
@@ -110,7 +126,7 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "clr %s", regNames[rd_rs1]);
             }
             // RET: JR x1 (jump register with ra)
-            else if (funct3 == 0x0 && funct4 == 0x4 && rs2 == 1) {
+            else if (funct3 == 0x0 && funct4 == 0xB  && rd_rs1 == 1 && rs2 == 0) {
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "ret");
             }
             // CALL: JALR x1, rs2 (jump and link with ra as destination)
@@ -126,9 +142,9 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "slt %s, %s", regNames[rd_rs1], regNames[rs2]);
             else if(funct3 == 0x2)
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "sltu %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if (funct3 == 0x3 && funct4 == 0x2)
-                snprintf(temp_instr_str, sizeof(temp_instr_str), "sll %s, %s", regNames[rd_rs1], regNames[rs2]);
             else if (funct3 == 0x3 && funct4 == 0x4)
+                snprintf(temp_instr_str, sizeof(temp_instr_str), "sll %s, %s", regNames[rd_rs1], regNames[rs2]);
+            else if (funct3 == 0x3 && funct4 == 0x5)
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "srl %s, %s", regNames[rd_rs1], regNames[rs2]);
             else if (funct3 == 0x3 && funct4 == 0x8)
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "sra %s, %s", regNames[rd_rs1], regNames[rs2]);
@@ -140,9 +156,9 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "xor %s, %s", regNames[rd_rs1], regNames[rs2]);
             else if (funct3 == 0x7)
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "mv %s, %s", regNames[rd_rs1], regNames[rs2]);
-            else if (funct3 == 0x0 && funct4 == 0x4)
-                snprintf(temp_instr_str, sizeof(temp_instr_str), "jr %s", regNames[rs2]);
-            else if (funct3 == 0x0 && funct4 == 0x8)
+            else if (funct3 == 0x0 && funct4 == 0xB)
+                snprintf(temp_instr_str, sizeof(temp_instr_str), "jr %s", regNames[rd_rs1]);
+            else if (funct3 == 0x0 && funct4 == 0xC)
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "jalr %s, %s", regNames[rd_rs1], regNames[rs2]);
             else
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "Unknown R-Type Instruction");
@@ -177,8 +193,9 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "sltiu %s, %u", regNames[rd_rs1], usimm);
             }
             else if(funct3 == 0x3) { // Shift immediates
-                uint8_t shamt = imm & 0x7;
-                uint8_t shift_type_bits = (imm >> 3) & 0x3;
+                uint8_t imm7 = (inst >> 9) & 0x7F;
+                uint8_t shamt = imm7 & 0x7;
+                uint8_t shift_type_bits = (imm7 >> 4) & 0x7;
                 if (shift_type_bits == 0x1)
                     snprintf(temp_instr_str, sizeof(temp_instr_str), "slli %s, %d", regNames[rd_rs1], shamt);
                 else if (shift_type_bits == 0x2)
@@ -349,9 +366,9 @@ int z16sim::executeInstruction(uint16_t inst) {
                 regs[rd_rs1] = ((int16_t)regs[rd_rs1] < (int16_t)regs[rs2]) ? 1 :0;
             else if(funct3 == 0x2)    // sltu (unsigned less than)
                 regs[rd_rs1] = (regs[rd_rs1] < regs[rs2]) ? 1: 0;
-            else if (funct3 == 0x3 && funct4 == 0x2)    // sll (shift left logical)
+            else if (funct3 == 0x3 && funct4 == 0x4)    // sll (shift left logical)
                 regs[rd_rs1] = regs[rd_rs1] << (regs[rs2] & 0xF); // Use lower 4 bits for shift amount (max 15)
-            else if (funct3 == 0x3 && funct4 == 0x4)    // srl (shift right logical)
+            else if (funct3 == 0x3 && funct4 == 0x5)    // srl (shift right logical)
                 regs[rd_rs1] = regs[rd_rs1] >> (regs[rs2] & 0xF);
             else if (funct3 == 0x3 && funct4 == 0x8)    // sra (shift right arithmetic)
                 regs[rd_rs1] = (uint16_t)(((int16_t)regs[rd_rs1]) >> (regs[rs2] & 0xF));
@@ -363,17 +380,17 @@ int z16sim::executeInstruction(uint16_t inst) {
                 regs[rd_rs1] = (regs[rd_rs1] ^ regs[rs2]);
             else if (funct3 == 0x7)    // mv (move, alias for add x_dest, x_src, x0)
                 regs[rd_rs1] = regs[rs2];
-            else if (funct3 == 0x0 && funct4 == 0x4) {    // jr (jump register)
-                // Infinity check commented out, frontend can implement
+            else if (funct3 == 0x0 && funct4 == 0xB) {    // jr (jump register)
                 pc = regs[rd_rs1];
                 pcUpdated = true;
             }
-            else if (funct3 == 0x0 && funct4 == 0x8) { // jalr (jump and link register)
-                // Infinity check commented out, frontend can implement
+            else if (funct3 == 0x0 && funct4 == 0xC) { // jalr (jump and link register)
                 regs[rd_rs1] = pc + 2; // Store return address
                 pc = regs[rs2];       // Jump to target address in rs2
                 pcUpdated = true;
             }
+
+            std::cout << "R TYPE: funct3: " << static_cast<int>(funct3) << " funct4: " << static_cast<int>(funct4) << std::endl;
             break;
         }
         case 0x1: { // I-type
@@ -387,20 +404,20 @@ int z16sim::executeInstruction(uint16_t inst) {
             else if(funct3 == 0x1) // slti (set less than immediate signed)
                 regs[rd_rs1]=((int16_t)regs[rd_rs1]<simm);
             else if(funct3 == 0x2) // sltiu (set less than immediate unsigned)
-                regs[rd_rs1]=(regs[rd_rs1]<(uint16_t)simm); // Note: Comparison with unsigned immediate
+                regs[rd_rs1]=(regs[rd_rs1]<(uint16_t)simm);
             else if(funct3 == 0x3) // Shift immediates
             {
                 uint8_t shamt = imm7 & 0x7; // Shift amount (3 bits for 16-bit shift)
-                uint8_t shift_type_bits = (imm7 >> 3) & 0x3; // The two most significant bits of the immediate control shift type
+                uint8_t shift_type_bits = (imm7 >> 4) & 0x7; // The two most significant bits of the immediate control shift type
                 if (shift_type_bits == 0x1) // 01b for SLLI
                     regs[rd_rs1]= regs[rd_rs1] << shamt;
                 else if (shift_type_bits == 0x2)// 10b for SRLI
                     regs[rd_rs1]= regs[rd_rs1] >> shamt;
-                else if (shift_type_bits == 0x3) // 11b for SRAI
+                else if (shift_type_bits == 0x4) // 11b for SRAI
                     regs[rd_rs1]= (uint16_t)(((int16_t)regs[rd_rs1]) >> shamt);
                 else {
                     std::cerr << "Unknown I-Type Shift instruction at PC 0x" << std::hex << pc << std::dec << "\n";
-                    return 0; // Terminate on unknown instruction
+                    return 0;
                 }
             }
             else if(funct3 == 0x4) // ori
@@ -411,65 +428,68 @@ int z16sim::executeInstruction(uint16_t inst) {
                 regs[rd_rs1] = regs[rd_rs1] ^ simm;
             else if(funct3 == 0x7) // li (load immediate)
                 regs[rd_rs1] = simm;
+
+            std::cout << "PC: " << pc << std::endl;
             break;
         }
-        // Fixed B-type (Branch) instruction handling in executeInstruction
-case 0x2: { // B-type (Branch)
-    uint8_t offset_val = (inst >> 12) & 0xF; // 4-bit offset
-    uint8_t rs1 = (inst >> 6) & 0x7;
-    uint8_t rs2 = (inst >> 9) & 0x7;
-    uint8_t funct3 = (inst >> 3) & 0x7;
 
-    // Sign extend the 4-bit offset
-    int16_t simm_offset = (offset_val & 0x8) ? (offset_val | 0xFFF0) : offset_val;
-    simm_offset <<= 1; // Scale offset by 2 for 16-bit instruction alignment
+    case 0x2: { // B-type (Branch)
+        uint8_t offset_val = (inst >> 12) & 0xF; // imm[4:1] (4-bit signed offset high bits)
+        uint8_t rs1 = (inst >> 6) & 0x7;
+        uint8_t rs2 = (inst >> 9) & 0x7;
+        uint8_t funct3 = (inst >> 3) & 0x7;
 
-    bool branch_taken = false;
-    switch (funct3) {
-        case 0x0: // BEQ
-            if (regs[rs1] == regs[rs2]) branch_taken = true;
-            break;
-        case 0x1: // BNE
-            if (regs[rs1] != regs[rs2]) branch_taken = true;
-            break;
-        case 0x2: // BZ
-            if (regs[rs1] == 0) branch_taken = true;
-            break;
-        case 0x3: // BNZ
-            if (regs[rs1] != 0) branch_taken = true;
-            break;
-        case 0x4: // BLT (signed)
-            if ((int16_t)regs[rs1] < (int16_t)regs[rs2]) branch_taken = true;
-            break;
-        case 0x5: // BGE (signed)
-            if ((int16_t)regs[rs1] >= (int16_t)regs[rs2]) branch_taken = true;
-            break;
-        case 0x6: // BLTU (unsigned)
-            if (regs[rs1] < regs[rs2]) branch_taken = true;
-            break;
-        case 0x7: // BGEU (unsigned)
-            if (regs[rs1] >= regs[rs2]) branch_taken = true;
-            break;
-        default:
-            std::cerr << "Unknown branch funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
-            return 0; // Terminate
-    }
+        // Sign extend the 4-bit offset
+        int16_t simm_offset = (offset_val & 0x8) ? (offset_val | 0xFFF0) : offset_val;
 
-    if (branch_taken) {
-        // Branch offset is relative to current instruction address
-        // pc currently points to the instruction being executed
-        uint16_t target_addr = pc + simm_offset;
-        pc = target_addr;
-        pcUpdated = true;
+        simm_offset <<= 1; // Shift left 1 to scale by 2 bytes (instruction size)
 
-        // Debug output to verify branch behavior
-        if (debug) {
-            std::cout << "Branch taken from 0x" << std::hex << (pc - simm_offset)
-                      << " to 0x" << pc << std::dec << " (offset: " << simm_offset << ")\n";
+        bool branch_taken = false;
+        switch (funct3) {
+            case 0x0: // BEQ
+                if (regs[rs1] == regs[rs2]) branch_taken = true;
+                break;
+            case 0x1: // BNE
+                if (regs[rs1] != regs[rs2]) branch_taken = true;
+                break;
+            case 0x2: // BZ
+                if (regs[rs1] == 0) branch_taken = true;
+                break;
+            case 0x3: // BNZ
+                if (regs[rs1] != 0) branch_taken = true;
+                break;
+            case 0x4: // BLT (signed)
+                if ((int16_t)regs[rs1] < (int16_t)regs[rs2]) branch_taken = true;
+                break;
+            case 0x5: // BGE (signed)
+                if ((int16_t)regs[rs1] >= (int16_t)regs[rs2]) branch_taken = true;
+                break;
+            case 0x6: // BLTU (unsigned)
+                if (regs[rs1] < regs[rs2]) branch_taken = true;
+                break;
+            case 0x7: // BGEU (unsigned)
+                if (regs[rs1] >= regs[rs2]) branch_taken = true;
+                break;
+            default:
+                std::cerr << "Unknown branch funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
+                return 0;
         }
+
+        if (branch_taken) {
+            uint16_t old_pc = pc;
+            // pc = pc + 2 simm_offset; // Add 2 to move past current instruction, then add signed offset
+            pc = pc + simm_offset; // Add 2 to move past current instruction, then add signed offset
+            pcUpdated = true;
+
+            if (debug) {
+                std::cout << "Branch taken from 0x" << std::hex << old_pc
+                        << " to 0x" << pc << std::dec
+                        << " (offset: " << simm_offset << ")\n";
+            }
+        }
+        break;
     }
-    break;
-}
+
         case 0x3: { // S-type (Store)
             uint8_t offset_val = (inst >> 12) & 0xF;
             uint8_t rs1 = (inst >> 6) & 0x7; // Base register
@@ -482,16 +502,32 @@ case 0x2: { // B-type (Branch)
             // Basic memory bounds check for store
             if (effective_address >= MEM_SIZE || (funct3 == 0x1 && (effective_address + 1 >= MEM_SIZE))) {
                 std::cerr << "Error: Memory access out of bounds for store at 0x" << std::hex << effective_address << std::dec << " at PC 0x" << std::hex << pc << std::dec << ".\n";
-                return 0; // Terminate simulation
+                return 0;
+            }
+
+            if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
+                graphics.updateGraphicsMemory(effective_address, regs[rs2] & 0xFF);
             }
 
             switch (funct3) {
                 case 0x0: // sb (store byte)
                     memory[effective_address] = (uint8_t)(regs[rs2] & 0xFF);
+                    std::cout << "effective address: " << effective_address << std::endl;
+                    std::cout << "regs[rs2]: " << regs[rs2] << " rs2: " << rs2 << std::endl;
+                    if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
+                        graphics.updateGraphicsMemory(effective_address + 1, regs[rs2] & 0xFF);
+
+                    }
+
                     break;
                 case 0x1: // sw (store word - 16-bit)
                     memory[effective_address] = regs[rs2] & 0xFF;         // Lower byte
                     memory[effective_address + 1] = (regs[rs2] >> 8) & 0xFF; // Upper byte
+
+                    // if (effective_address >= 0x0000 && effective_address <= 0x093B) {
+                    // graphics.updateGraphicsMemory(effective_address + 1, (regs[rs2] >> 8) & 0xFF);
+                    // }
+
                     break;
                 default:
                     std::cerr << "Unknown store funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
@@ -537,27 +573,26 @@ case 0x2: { // B-type (Branch)
             }
             break;
         }
+
         case 0x5: { // J-type (Jump)
             uint8_t f = (inst >> 15) & 0x1;
             uint8_t imm9_4 = (inst >> 9) & 0x3F;
             uint8_t rd = (inst >> 6) & 0x7;
             uint8_t imm3_1 = (inst >> 3) & 0x7;
 
-            int16_t simm_jump = (imm9_4 << 4) | (imm3_1 << 1); // Construct 10-bit immediate, scaled
+            // Assemble the 10-bit immediate (remember LSB is always 0 due to alignment)
+            uint16_t imm = (imm9_4 << 4) | (imm3_1 << 1);  // 10-bit unsigned
 
-            // Sign-extend the 10-bit immediate
-            if (simm_jump & 0x200) // If 10th bit (0x200) is set
-                simm_jump |= 0xFC00; // Sign extend to 16 bits
+            // Sign-extend the 10-bit immediate to 16 bits
+            int16_t jump_offset = (int16_t)((imm ^ 0x200) - 0x200);  // sign-extension
 
-            if (f == 0) { // j (unconditional jump)
-                // Infinity check commented out
-                pc += simm_jump;
+            if (f == 0) { // j (unconditional)
+                pc += jump_offset;
+            } else { // jal
+                regs[rd] = pc + 2;
+                pc += jump_offset;
             }
-            else { // jal (jump and link)
-                // Infinity check commented out
-                regs[rd] = pc + 2; // Store return address
-                pc += simm_jump;   // Jump to target
-            }
+
             pcUpdated = true;
             break;
         }
@@ -565,50 +600,106 @@ case 0x2: { // B-type (Branch)
         case 0x6: { // U-type (Upper immediate)
             uint8_t f = (inst >> 15) & 0x1;
             uint8_t rd  = (inst >> 6) & 0x7;
-            uint16_t I_upper = (inst >> 7) & 0xFF; // 8-bit immediate from bits [14:7]
+            // uint16_t I_upper = (inst >> 7) & 0xFF; // 8-bit immediate from bits [14:7]
+            uint16_t I_lower = (inst >> 3) & 0x7; // 3-bit immediate from bits [5:3]
+            uint16_t I_upper = (inst >> 9) & 0x3F; // 6-bit immediate from bits [14:9]
+            uint16_t imm = I_lower | (I_upper << 3);
 
-            if(f==0)    // lui (load upper immediate)
-                regs[rd] = (I_upper << 7); // Load upper 8 bits, shifted by 7 to align
+            if (f == 0)    // lui (load upper immediate)
+                regs[rd] = imm << 7; // Load upper 8 bits, shifted by 7 to align
             else        // auipc (add upper immediate to PC)
-                regs[rd] = pc + (I_upper << 7); // Add PC-relative immediate
+                regs[rd] = pc + (imm << 7); // Add PC-relative immediate
             break;
         }
         case 0x7: { // System instruction (ecall)
-            uint8_t funct3  = (inst >> 3) & 0x7;
-            uint8_t Service  = (inst >> 6) & 0x7; // Service number (from bits 8:6)
-            if(funct3 == 0x0) {
-                switch (Service) {
-                    case 0x1: { // print_int (a0)
-                        int16_t number = regs[6]; // Assuming a0 (x6) holds the integer
-                        std::cout << number << "\n";
+            uint16_t svc = (inst >> 6) & 0x3FF; // (10-bit system-call number)
+            uint8_t func3 = (inst >> 3) & 0x7; // 000
+            if (func3 == 0x0) {
+                if (svc == 0x0) // Print character syscall
+                    printf("%c", regs[6] & 0xFF); // a0 is in regs[6]
+                else if (svc == 0x1) // Read char into a0
+                    regs[6] = getchar() & 0xFF;
+                else if (svc == 0x2) // Print string syscall
+                    printf("%s", (char*)&memory[regs[6]]);
+                else if (svc == 0x3) // # Print decimal
+                    printf("%d", (int16_t)regs[6]);
+                else if (svc == 0x4) { // Play Tone
+                    uint16_t freq = regs[6];      // a0
+                    uint16_t duration = regs[7];  // a1
+
+                    // Defensive checks
+                    if (freq < 20 || freq > 20000) { // Human hearing range
+                        std::cout << "Invalid frequency: " << freq << " Hz (must be 20-20000)\n";
                         break;
                     }
-                    case 0x5: { // print_string (a0)
-                        uint16_t string_addr = regs[6]; // Assuming a0 (x6) holds the address
-                        if (string_addr < MEM_SIZE) {
-                            std::cout << (char*)&memory[string_addr] << "\n";
-                        } else {
-                            std::cerr << "Error: Attempted to print string from out-of-bounds address 0x" << std::hex << string_addr << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
-                            return 0; // Terminate simulation on error
-                        }
+                    if (duration == 0 || duration > 5000) { // 0 < duration <= 5 seconds
+                        std::cout << "Invalid duration: " << duration << " ms (must be 1-5000)\n";
                         break;
                     }
-                    case 0x3: { // exit
-                        return 0; // Signal to halt simulation from within the class
-                    }
-                    default:
-                        std::cerr << "Unknown ecall service: " << (int)Service << " at PC 0x" << std::hex << pc << std::dec << "\n";
-                        return 0; // Terminate on unknown ecall service
+                     playTone(static_cast<float>(regs[6]), static_cast<int>(regs[7]));
+
+                    break;
                 }
-            } else {
-                std::cerr << "Unknown system funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
-                return 0; // Terminate on unknown system instruction
+
+
+                else if (svc == 0x5) { // Set Audio Volume
+                    uint8_t volume = regs[6] & 0xFF; // a0
+                    float sfmlVolume = (volume / 255.0f) * 100.0f;
+                    std::cout << "[Audio] Set volume to " << (int)volume << " (SFML: " << sfmlVolume << ")\n";
+                    music.setVolume(10); // music must be a persistent sf::Music or sf::Sound object
+                }
+                else if (svc == 0x6) { // Stop Audio Playback
+                    std::cout << "[Audio] Stop playback\n";
+                }
+                else if (svc == 0x7) { // Read Keyboard
+                    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) {
+                        regs[6] = 'w';
+                        regs[7] = 1;
+                    }
+                    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) {
+                        regs[6] = 's';
+                        regs[7] = 1;
+                    }
+                    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::O)) {
+                        regs[6] = 'o';
+                        regs[7] = 1;
+                    }
+                    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::L)) {
+                        regs[6] = 'l';
+                        regs[7] = 1;
+                    }
+                    else {
+                        regs[6] = 0;
+                        regs[7] = 0;
+                    }
+                }
+                else if (svc == 0x8) { // Registers Dump
+                    dumpRegisters();
+                }
+                else if (svc == 0x9) { // Memory Dump
+                    uint16_t addr = regs[6];
+                    uint16_t len = regs[7];
+                    std::cout << "--- Memory Dump ---\n";
+                    for (uint16_t i = 0; i < len; ++i) {
+                        if (i % 16 == 0) std::cout << "\n0x" << std::hex << (addr + i) << ": ";
+                        std::cout << std::setw(2) << std::setfill('0') << std::hex << (int)memory[addr + i] << " ";
+                    }
+                    std::cout << std::dec << "\n-------------------\n";
+                }
+                else if (svc == 0x3FF) // Exit program syscall
+                    return 0;
+
+                else
+                    printf("Unknown ecall: 0x%03X\n", svc);
+                break;
             }
+            printf("Invalid system instruction: 0x%X\n", func3);
             break;
         }
+
         default:
             std::cerr << "Unknown instruction opcode 0x" << std::hex << (int)opcode << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
-            return 0; // Terminate on unknown opcode
+            return 0;
     }
 
     if(!pcUpdated)
@@ -645,7 +736,7 @@ bool z16sim::cycle() {
 }
 
 int main(int argc, char **argv) {
-    z16sim simulator; // Create an instance of your simulator
+    z16sim simulator;
     bool interactive_mode = false;
     std::string machine_code_file;
 
@@ -660,44 +751,87 @@ int main(int argc, char **argv) {
         if (std::string(argv[1]) == "-i") {
             interactive_mode = true;
             machine_code_file = argv[2];
-        } else {
+        }
+
+        else {
             std::cerr << "Unknown option: " << argv[1] << "\n";
             std::cerr << "Usage: " << argv[0] << " <machine_code_file>\n";
             std::cerr << "       " << argv[0] << " -i <machine_code_file> (for interactive/step-by-step mode)\n";
             return 1;
         }
-    } else { // argc == 2
+
+    }
+
+    else { // argc == 2
         machine_code_file = argv[1];
     }
+
 
     // --- 2. Load Memory ---
     try {
         simulator.loadMemoryFromFile(machine_code_file.c_str());
         // This message will be part of the initial output captured by the backend
         std::cout << "Loaded machine code from " << machine_code_file << std::endl;
-    } catch (const std::runtime_error& e) {
+    }
+
+    catch (const std::runtime_error& e) {
         std::cerr << e.what() << std::endl;
         return 1;
     }
 
+
     // --- 3. Handle Simulation Modes ---
     if (!interactive_mode) {
         // --- Full Simulation Mode ---
-        // In this mode, the simulator runs until completion or halt.
-        // The `simulator.cycle()` method should print any desired output (disassembly, debug info)
-        // based on its internal flags.
         std::cout << "Starting full simulation..." << std::endl;
         simulator.setDebug(true); // Enable debug output for full simulation too
+        bool programRunning = true;
 
-        while(simulator.cycle()) {
-            // Loop continues as long as simulator.cycle() returns true (not halted)
+        while (programRunning) {
+            if (simulator.graphics.needsGraphics()){
+                std::cout << "if you see this then needsGraphics returned true" << std::endl;
+                if (!simulator.graphics.handleEvents())
+                    break;
+                else std::cout << "if you see this then handleEvents returned true" << std::endl;
+            }
+
+            if (!simulator.cycle()) {
+                programRunning = false;
+                std::cout << "Program execution completed." << std::endl;
+
+                if (simulator.graphics.needsGraphics()) {
+                        std::cout << "Press ESC or close window to exit." << std::endl;
+
+                        while (simulator.graphics.window.isOpen()) {
+                            if (!simulator.graphics.handleEvents())
+                                break;
+
+                            simulator.graphics.renderScreen();
+                            simulator.graphics.window.clear();
+                            simulator.graphics.window.draw(simulator.graphics.screenSprite);
+                            simulator.graphics.window.display();
+                            // sf::sleep(sf::milliseconds(100));
+                        }
+                    }
+
+                break;
+
+            }
+
+            // Update graphics
+            if (simulator.graphics.needsGraphics()) {
+                    simulator.graphics.renderScreen();
+                    simulator.graphics.window.clear();
+                    simulator.graphics.window.draw(simulator.graphics.screenSprite);
+                    simulator.graphics.window.display();
+                    sf::sleep(sf::milliseconds(16)); // ~60 FPS
+                }
         }
-        std::cout << "Full simulation finished." << std::endl;
 
-    } else {
+    }
+
+    else {
         // --- Interactive/Step-by-Step Mode ---
-        // In this mode, the simulator executes one instruction per input from the backend.
-        // `setDebug(true)` is crucial here to ensure `cycle()` prints register/memory state.
         simulator.setDebug(true);
 
         std::cout << "Starting interactive simulation." << std::endl;
@@ -705,7 +839,7 @@ int main(int argc, char **argv) {
 
         // After initial setup and printing the initial state, signal readiness
         std::cout << "READY_FOR_STEP" << std::endl;
-        std::cout.flush(); // Ensure this is sent immediately
+        std::cout.flush();
 
         std::string line_input;
         while(true) {
@@ -722,23 +856,32 @@ int main(int argc, char **argv) {
                 break;
             }
 
+
+            if (simulator.graphics.needsGraphics() && !simulator.graphics.handleEvents())
+                break;
+
             // Execute one simulation cycle (one instruction)
-            // The simulator.cycle() method, because debug is true, should print
-            // the disassembled instruction and the updated register state.
             if (!simulator.cycle()) {
                 // If cycle() returns false, it means the simulation has halted (e.g., reached HLT instruction).
                 std::cout << "Simulation halted." << std::endl;
-                // No need to send READY_FOR_STEP if the simulation has finished;
-                // the process will terminate, and the backend will detect it.
                 break;
+            }
+
+            // update graphics
+            if (simulator.graphics.needsGraphics()) {
+                simulator.graphics.renderScreen();
+                simulator.graphics.window.clear();
+                simulator.graphics.window.draw(simulator.graphics.screenSprite);
+                simulator.graphics.window.display();
             }
 
             // If the simulation is still running, signal readiness for the next step
             std::cout << "READY_FOR_STEP" << std::endl;
-            std::cout.flush(); // Ensure this is sent immediately
+            std::cout.flush();
         }
         std::cout << "Interactive simulation finished." << std::endl;
     }
 
+    simulator.graphics.cleanup();
     return 0;
 }
