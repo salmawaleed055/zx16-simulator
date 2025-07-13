@@ -1,0 +1,125 @@
+# ZX16 Recursive Power Function Test
+# Tests recursive power calculation (base^exponent) using R-type instructions
+# Limited to registers x0-x7 and 2-operand instructions
+
+.text
+.org 0x0020
+main:
+    # Initialize stack pointer to safe memory region
+    li x2, 0x7FFE       # Set stack pointer to near end of memory
+
+    # Test power function: calculate 2^3 = 8
+    li x1, 2            # Base
+    li x3, 3            # Exponent (using x3 instead of x2 since x2 is stack pointer)
+    call power          # Call power function
+
+    # Store result in memory
+    li x4, 0x8000
+    sw x1, 0(x4)        # Store result (should be 8)
+
+    # Test another case: 3^2 = 9
+    li x1, 3            # Base
+    li x3, 2            # Exponent
+    call power          # Call power function
+
+    # Store second result
+    li x4, 0x8004
+    sw x1, 0(x4)        # Store result (should be 9)
+
+    # Test edge case: 5^0 = 1
+    li x1, 5            # Base
+    li x3, 0            # Exponent
+    call power          # Call power function
+
+    # Store third result
+    li x4, 0x8008
+    sw x1, 0(x4)        # Store result (should be 1)
+
+    # Exit
+    clr x1
+    ecall 3
+
+# Recursive Power function
+# Input: x1 = base, x3 = exponent (changed from x2 to avoid stack pointer conflict)
+# Output: x1 = base^exponent
+# Uses: x4, x5, x6, x7 for temporary storage
+# x2 is reserved for stack pointer
+power:
+    # Base case: if exponent == 0, return 1
+    nop
+    addi x4, x0, 0      # x4 = 0
+    sub x5, x3, x4      # x5 = exponent - 0
+    slt x6, x5, x4      # x6 = 1 if exponent < 0, else 0
+    slt x7, x4, x5      # x7 = 1 if 0 < exponent, else 0
+    xor x6, x7          # x6 = x6 XOR x7 (1 if exponent == 0)
+
+    # If exponent == 0, return 1
+    li x4, 1
+    and x5, x6, x4      # x5 = 1 if base case, else 0
+
+    # Create mask for recursive case
+    xor x7, x6, x4      # x7 = NOT x6 (0 if base case, 1 if recursive)
+
+    # Recursive case: base * power(base, exponent-1)
+    # Manual stack operations - save registers
+    addi x2, x2, -2     # Decrement stack pointer
+    sw x1, 0(x2)        # Save base
+    addi x2, x2, -2     # Decrement stack pointer
+    sw x3, 0(x2)        # Save exponent
+
+    # Calculate power(base, exponent-1)
+    addi x3, x3, -1     # exponent = exponent - 1
+    call power          # power(base, exponent-1)
+
+    # Manual stack operations - restore registers
+    lw x3, 0(x2)        # Restore exponent
+    addi x2, x2, 2      # Increment stack pointer
+    lw x4, 0(x2)        # Get original base
+    addi x2, x2, 2      # Increment stack pointer
+
+    # Multiply base * power(base, exponent-1)
+    add x5, x1, x0      # Copy power result to x5
+    call multiply       # Call multiplication function (x4=base, x5=power_result)
+    add x1, x6, x0      # Move multiplication result to x1
+
+    # Combine base case and recursive results
+    li x4, 1
+    and x5, x6, x4      # Base case result (1) if base case
+    and x7, x7, x1      # Recursive result if recursive case
+    or x1, x5, x7       # Final result
+
+    ret
+
+# Manual multiplication function (since no mul instruction)
+# Input: x4 = multiplicand, x5 = multiplier
+# Output: x6 = result
+# Uses: x7 for temporary storage
+multiply:
+    add x6, x0, x0      # Initialize result to 0
+    add x7, x4, x0      # Copy multiplicand
+
+multiply_loop:
+    # Check if multiplier is zero
+    slt x4, x0, x5      # x4 = 1 if multiplier > 0, else 0
+
+    # If multiplier > 0, add multiplicand to result
+    and x4, x4, x7      # x4 = multiplicand if multiplier > 0, else 0
+    add x6, x6, x4      # Add to result
+
+    # Decrement multiplier
+    addi x5, x5, -1     # multiplier--
+
+    # Check if we should continue loop
+    slt x4, x0, x5      # x4 = 1 if multiplier > 0, else 0
+
+    # Simple conditional jump using branch
+    bne x4, x0, multiply_loop  # Continue if multiplier > 0
+
+multiply_end:
+    ret
+
+# Test helper function for verification
+test_helper:
+    # Simple function that doubles x1
+    add x1, x1, x1      # x1 = x1 * 2
+    jr x1               # Return
