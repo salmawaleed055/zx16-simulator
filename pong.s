@@ -14,8 +14,8 @@
 .equ PADDLE_LENGTH, 3
 .equ PADDLE_SPEED, 1
 .equ BALL_SPEED, 1
-.equ LEFT_PADDLE_X, 7
-.equ RIGHT_PADDLE_X, 13
+.equ LEFT_PADDLE_X, 8
+.equ RIGHT_PADDLE_X, 8
 .equ PADDLE_MIN_X, 1
 .equ PADDLE_MAX_X, 17
 
@@ -86,29 +86,6 @@ init_graphics:
         addi s0, -1
         bnz s0, init_paddle_tile
 
-    
-    # ball tile (white)
-     li t0, TILE_DATA_BASE
-     addi t0, 63 
-     addi t0, 63
-     addi t0, 2
-     addi t0, 63
-     addi t0, 63
-     addi t0, 2
-     addi t0, 59
-
-     li t1, 0x22
-     li s0, 63
-    addi s0, 1
-
-
-     addi x0, 0
-     init_ball_tile:
-         sb t1, 0(t0)
-         addi t0, 1
-         addi s0, -1
-         bnz s0, init_ball_tile
-
     draw_paddles:
         # player 1
         li t0, TILE_MAP_BASE
@@ -125,41 +102,34 @@ init_graphics:
         addi t1, 1
         sb s1, 0(t1)
 
-    li   t1, 0 
-    li   s0, 0
-    
-    # draw_ball:
-        # la t0, ball_x
-        lui t0, 0x1E2
-        ori t0, 0x30
 
-        lw a0, 0(t0)
-
-        # la t0, ball_y
-        lui t0, 0x1E2
-        ori t0, 0x32
-
-        lw a1, 0(t0)
-
-        # li t0, 20
-
-        mv t1, a1 # 7
-        slli t1, 4
-
-        mv s0, a1
-        slli s0, 2
-
-        add t1, s0
-        add t1, a0
-
+        # player 2
         li t0, TILE_MAP_BASE
-        add t1, t0 
+        li a0, 63
+        addi a0, 63
+        addi a0, 63
+        addi a0, 63
+        addi a0, 28
 
-        li s1, BALL_TILE
+        add t0, a0
+
+        li a0, RIGHT_PADDLE_X
+        add t0, a0
+        mv t1, t0
+
+        li s1, PADDLE_TILE
         sb s1, 0(t1)
 
+        addi t1, 1
+        sb s1, 0(t1)
+
+        addi t1, 1
+        sb s1, 0(t1)
+
+
+
     ecall 0x000 
-    ecall 0x3FF
+    ecall 0x3FF  
 
 
-
+    # end
