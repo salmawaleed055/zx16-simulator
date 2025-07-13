@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>        
 #include <SFML/Graphics.hpp> 
+// #include <SFML/System.hpp>
 #include "graphics.h"
 
 class z16sim {
@@ -18,16 +19,21 @@ private:
     // Simulator state
     uint16_t regs[NUM_REGS];
     uint16_t pc;
-    unsigned char memory[MEM_SIZE];
+    // unsigned char memory[MEM_SIZE];
     bool debug;
-    bool verbose; 
-    int infinityCheck[4];
+    // bool verbose; 
+    // int infinityCheck[4];
+
+
 
     // Register name mappings (static member, initialized in .cpp)
     static const char* regNames[NUM_REGS];
     void setReg(uint8_t reg_idx, uint16_t value); 
 
 public:
+    Memory memory;
+    Graphics graphics; // instance of graphics class
+
     z16sim(); // Constructor
     void dumpRegisters() const;
     void loadMemoryFromFile(const char* filename); 
@@ -50,13 +56,10 @@ public:
         if (index >= 0 && index < NUM_REGS) return regs[index];
         return 0; 
     }
-    unsigned char getMemByte(uint16_t addr) const {
-        if (addr < MEM_SIZE) return memory[addr];
-        return 0; 
-    }
-
-
-    Graphics graphics; // instance of graphics class
+    // unsigned char getMemByte(uint16_t addr) const {
+    //     if (addr < MEM_SIZE) return memory[addr];
+    //     return 0; 
+    // }
 
 };
 

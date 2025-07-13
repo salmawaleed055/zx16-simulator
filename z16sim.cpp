@@ -5,54 +5,62 @@
 #include <stdexcept> 
 #include <cstdio>    
 #include <cstring>
-#include <thread>   // For std::this_thread
-#include <chrono>   // For std::chrono
-#include <SFML/Audio.hpp>
+// #include <thread>   // For std::this_thread
+// #include <chrono>   // For std::chrono
+// #include <SFML/Audio.hpp>
 #include <cmath>
 
-sf::Music music;
+// sf::Music music;
 
-void playTone(float frequency, int durationMs) {
-    const int sampleRate = 44100;
-    int sampleCount = sampleRate * durationMs / 1000;
-    std::vector<sf::Int16> samples(sampleCount);
+// void playTone(float frequency, int durationMs) {
+//     const int sampleRate = 44100;
+//     int sampleCount = sampleRate * durationMs / 1000;
+//     std::vector<sf::Int16> samples(sampleCount);
 
-    for (int i = 0; i < sampleCount; ++i) {
-        samples[i] = 30000 * std::sin(2 * 3.14159265f * frequency * i / sampleRate);
-    }
+//     for (int i = 0; i < sampleCount; ++i) {
+//         samples[i] = 30000 * std::sin(2 * 3.14159265f * frequency * i / sampleRate);
+//     }
 
-    sf::SoundBuffer buffer;
-    if (!buffer.loadFromSamples(samples.data(), sampleCount, 1, sampleRate)) {
-        std::cerr << "Failed to load sound buffer" << std::endl;
-        return;
-    }
+//     sf::SoundBuffer buffer;
+//     if (!buffer.loadFromSamples(samples.data(), sampleCount, 1, sampleRate)) {
+//         std::cerr << "Failed to load sound buffer" << std::endl;
+//         return;
+//     }
 
-    sf::Sound sound(buffer);
-    sound.play();
+//     sf::Sound sound(buffer);
+//     sound.play();
 
-    while (sound.getStatus() == sf::Sound::Playing) {
-        sf::sleep(sf::milliseconds(10));
-    }
-}
+//     while (sound.getStatus() == sf::Sound::Playing) {
+//         sf::sleep(sf::milliseconds(10));
+//     }
+// }
 
 // Initialize static member (outside class definition)
 const char* z16sim::regNames[z16sim::NUM_REGS] = {"t0", "ra", "sp", "s0", "s1", "t1", "a0", "a1"};
 
 
 // Constructor
-z16sim::z16sim() : pc(0), debug(false) {
+z16sim::z16sim() : pc(0), debug(false), memory(), graphics(&memory) {
     memset(regs, 0, sizeof(regs));
-    memset(memory, 0, sizeof(memory));
+    // memset(memory, 0, sizeof(memory));
 
 
     // Initialize graphics memory
-    memset(graphics.tileMap, 0, sizeof(graphics.tileMap));
-    memset(graphics.tileData, 0, sizeof(graphics.tileData));
-    memset(graphics.colorPalette, 0, sizeof(graphics.colorPalette));
-    memset(graphics.frameBuffer, 0, sizeof(graphics.frameBuffer));
-    graphics.screenNeedsUpdate = true;
-    graphics.graphicsInitialized = false;
-    graphics.graphicsMemoryAccessed = false;
+    // memset(graphics.tileMap, 0, sizeof(graphics.tileMap));
+    // memset(graphics.tileData, 0, sizeof(graphics.tileData));
+    // memset(graphics.colorPalette, 0, sizeof(graphics.colorPalette));
+    // memset(graphics.frameBuffer, 0, sizeof(graphics.frameBuffer));
+    // graphics.screenNeedsUpdate = true;
+    // graphics.graphicsInitialized = false;
+    // graphics.graphicsMemoryAccessed = false;
+
+    // Set up MMIO callbacks
+        memory.registerMMIOCallback(0xF000, 0xFA0F, 
+            [this](uint16_t addr, uint8_t value) {
+                this->graphics.onGraphicsMemoryWrite(addr, value);
+            });
+    
+
 }
 
 
@@ -60,7 +68,7 @@ z16sim::z16sim() : pc(0), debug(false) {
 // Resets the simulator state
 void z16sim::reset() {
     memset(regs, 0, sizeof(regs));
-    memset(memory, 0, sizeof(memory));
+    // memset(memory, 0, sizeof(memory));
     pc = 0;
     debug = false;
     
@@ -91,18 +99,21 @@ void z16sim::dumpRegisters() const {
 
 // Loads machine code from a .bin file into memory. No user prompts.
 void z16sim::loadMemoryFromFile(const char* filename) {
-    FILE *file = fopen(filename, "rb");
-    if (file == NULL) {
-        throw std::runtime_error("Error: Could not open file " + std::string(filename));
-    }
+    // FILE *file = fopen(filename, "rb");
+    // if (file == NULL) {
+    //     throw std::runtime_error("Error: Could not open file " + std::string(filename));
+    // }
 
-    size_t bytesRead = std::fread(memory, 1, MEM_SIZE, file);
-    if (std::ferror(file)) {
-        std::fclose(file);
-        throw std::runtime_error("Error reading file " + std::string(filename));
-    }
-    std::fclose(file);
+    // size_t bytesRead = std::fread(memory, 1, MEM_SIZE, file);
+    // if (std::ferror(file)) {
+    //     std::fclose(file);
+    //     throw std::runtime_error("Error reading file " + std::string(filename));
+    // }
+    // std::fclose(file);
 
+    memory.loadFromFile(filename);
+    std::cout << "Entry point (0x0020): 0x" << std::hex 
+              << memory.loadW(0x0020) << std::dec << std::endl;
 }
 
 
@@ -500,35 +511,31 @@ int z16sim::executeInstruction(uint16_t inst) {
             uint16_t effective_address = regs[rs1] + simm_offset;
 
             // Basic memory bounds check for store
-            if (effective_address >= MEM_SIZE || (funct3 == 0x1 && (effective_address + 1 >= MEM_SIZE))) {
-                std::cerr << "Error: Memory access out of bounds for store at 0x" << std::hex << effective_address << std::dec << " at PC 0x" << std::hex << pc << std::dec << ".\n";
-                return 0;
-            }
+            // if (effective_address >= MEM_SIZE || (funct3 == 0x1 && (effective_address + 1 >= MEM_SIZE))) {
+            //     std::cerr << "Error: Memory access out of bounds for store at 0x" << std::hex << effective_address << std::dec << " at PC 0x" << std::hex << pc << std::dec << ".\n";
+            //     return 0;
+            // }
 
-            if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
-                graphics.updateGraphicsMemory(effective_address, regs[rs2] & 0xFF);
-            }
+            // if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
+            //     graphics.updateGraphicsMemory(effective_address, regs[rs2] & 0xFF);
+            // }
 
             switch (funct3) {
                 case 0x0: // sb (store byte)
-                    memory[effective_address] = (uint8_t)(regs[rs2] & 0xFF);
-                    std::cout << "effective address: " << effective_address << std::endl;
-                    std::cout << "regs[rs2]: " << regs[rs2] << " rs2: " << rs2 << std::endl;
-                    if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
-                        graphics.updateGraphicsMemory(effective_address + 1, regs[rs2] & 0xFF);
-
-                    }
-
+                    // memory[effective_address] = (uint8_t)(regs[rs2] & 0xFF);
+                    // std::cout << "effective address: " << effective_address << std::endl;
+                    // std::cout << "regs[rs2]: " << regs[rs2] << " rs2: " << rs2 << std::endl;
+                    // if (effective_address >= 0xF000 && effective_address <= 0xFA0F) {
+                    //     graphics.updateGraphicsMemory(effective_address + 1, regs[rs2] & 0xFF);
+                    memory.store(effective_address, regs[rs2] & 0xFF);
                     break;
+  
                 case 0x1: // sw (store word - 16-bit)
-                    memory[effective_address] = regs[rs2] & 0xFF;         // Lower byte
-                    memory[effective_address + 1] = (regs[rs2] >> 8) & 0xFF; // Upper byte
+                    // memory[effective_address] = regs[rs2] & 0xFF;         // Lower byte
+                    // memory[effective_address + 1] = (regs[rs2] >> 8) & 0xFF; // Upper byte
+                    memory.storeW(effective_address, regs[rs2]);
+                     break;
 
-                    // if (effective_address >= 0x0000 && effective_address <= 0x093B) {
-                    // graphics.updateGraphicsMemory(effective_address + 1, (regs[rs2] >> 8) & 0xFF);
-                    // }
-
-                    break;
                 default:
                     std::cerr << "Unknown store funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
                     return 0; // Terminate
@@ -545,28 +552,32 @@ int z16sim::executeInstruction(uint16_t inst) {
 
             uint16_t effective_address = regs[rs2] + simm_offset;
 
-            // Basic memory bounds check for load
-            if (effective_address >= MEM_SIZE || (funct3 == 0x1 && (effective_address + 1 >= MEM_SIZE))) {
-                std::cerr << "Error: Memory access out of bounds for load at 0x" << std::hex << effective_address << std::dec << " at PC 0x" << std::hex << pc << std::dec << ".\n";
-                return 0; // Terminate simulation
-            }
+            // // Basic memory bounds check for load
+            // if (effective_address >= MEM_SIZE || (funct3 == 0x1 && (effective_address + 1 >= MEM_SIZE))) {
+            //     std::cerr << "Error: Memory access out of bounds for load at 0x" << std::hex << effective_address << std::dec << " at PC 0x" << std::hex << pc << std::dec << ".\n";
+            //     return 0; // Terminate simulation
+            // }
 
             switch (funct3) {
                 case 0x0: { // lb (load byte signed)
-                    int8_t loaded_byte = (int8_t)memory[effective_address];
+                    int8_t loaded_byte = (int8_t)memory.load(effective_address);
                     regs[rd] = (uint16_t)loaded_byte; // Sign-extend to 16 bits
                     break;
                 }
+
                 case 0x1: { // lw (load word - 16-bit)
-                    uint16_t word = memory[effective_address + 1]; // High byte (little-endian assumed)
-                    word = (word << 8) | memory[effective_address]; // Low byte
-                    regs[rd] = word;
+                    // uint16_t word = memory[effective_address + 1]; // High byte (little-endian assumed)
+                    // word = (word << 8) | memory[effective_address]; // Low byte
+                    // regs[rd] = word;
+                    regs[rd] = memory.loadW(effective_address);
                     break;
                 }
+
                 case 0x4: { // lbu (load byte unsigned)
-                    regs[rd] = (uint16_t)memory[effective_address]; // Zero-extend to 16 bits
+                    regs[rd] = (uint16_t)memory.load(effective_address); // Zero-extend to 16 bits
                     break;
                 }
+                
                 default:
                     std::cerr << "Unknown load funct3: 0x" << std::hex << (int)funct3 << std::dec << " at PC 0x" << std::hex << pc << std::dec << "\n";
                     return 0; // Terminate
@@ -620,7 +631,15 @@ int z16sim::executeInstruction(uint16_t inst) {
                 else if (svc == 0x1) // Read char into a0
                     regs[6] = getchar() & 0xFF;
                 else if (svc == 0x2) // Print string syscall
-                    printf("%s", (char*)&memory[regs[6]]);
+                //     printf("%s", (char*)&memory[regs[6]]);
+                {  // Print string syscall
+                    uint16_t addr = regs[6];    // starting address of the string
+                    uint8_t b;
+                    // read bytes until you hit a NUL
+                    while ((b = memory.load(addr++)) != 0) {
+                        putchar(static_cast<char>(b));
+                    }
+                }
                 else if (svc == 0x3) // # Print decimal
                     printf("%d", (int16_t)regs[6]);
                 else if (svc == 0x4) { // Play Tone
@@ -636,7 +655,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                         std::cout << "Invalid duration: " << duration << " ms (must be 1-5000)\n";
                         break;
                     }
-                     playTone(static_cast<float>(regs[6]), static_cast<int>(regs[7]));
+                    //  playTone(static_cast<float>(regs[6]), static_cast<int>(regs[7]));
 
                     break;
                 }
@@ -646,7 +665,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                     uint8_t volume = regs[6] & 0xFF; // a0
                     float sfmlVolume = (volume / 255.0f) * 100.0f;
                     std::cout << "[Audio] Set volume to " << (int)volume << " (SFML: " << sfmlVolume << ")\n";
-                    music.setVolume(10); // music must be a persistent sf::Music or sf::Sound object
+                    // music.setVolume(10); // music must be a persistent sf::Music or sf::Sound object
                 }
                 else if (svc == 0x6) { // Stop Audio Playback
                     std::cout << "[Audio] Stop playback\n";
@@ -682,7 +701,7 @@ int z16sim::executeInstruction(uint16_t inst) {
                     std::cout << "--- Memory Dump ---\n";
                     for (uint16_t i = 0; i < len; ++i) {
                         if (i % 16 == 0) std::cout << "\n0x" << std::hex << (addr + i) << ": ";
-                        std::cout << std::setw(2) << std::setfill('0') << std::hex << (int)memory[addr + i] << " ";
+                        std::cout << std::setw(2) << std::setfill('0') << std::hex << (int)memory.load(addr + i) << " ";
                     }
                     std::cout << std::dec << "\n-------------------\n";
                 }
@@ -716,7 +735,15 @@ bool z16sim::cycle() {
         return false; // PC out of bounds, stop simulation
     }
 
-    uint16_t inst = memory[pc] | (memory[pc+1] << 8);
+    // uint16_t inst = memory[pc] | (memory[pc+1] << 8);
+    uint16_t inst;
+    try {
+        inst = memory.loadW(pc);
+    } 
+    catch (...) {
+        std::cerr << "Failed to fetch instructoin at PC 0x" << std::hex << pc << std::dec << std::endl;
+        return false;
+    }
 
     char disasmBuf[128]; // Buffer for disassembled instruction string
     disassemble(inst, pc, disasmBuf, sizeof(disasmBuf));
@@ -779,6 +806,9 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    simulator.setPC(0x0020);
+    simulator.graphics.initGraphics();
+    simulator.graphics.setNeedsUpdate();
 
     // --- 3. Handle Simulation Modes ---
     if (!interactive_mode) {
@@ -806,11 +836,12 @@ int main(int argc, char **argv) {
                             if (!simulator.graphics.handleEvents()) 
                                 break;
 
-                            simulator.graphics.renderScreen();
-                            simulator.graphics.window.clear();
-                            simulator.graphics.window.draw(simulator.graphics.screenSprite);
-                            simulator.graphics.window.display();
+                            // simulator.graphics.renderScreen();
+                            // simulator.graphics.window.clear();
+                            // simulator.graphics.window.draw(simulator.graphics.screenSprite);
+                            // simulator.graphics.window.display();
                             // sf::sleep(sf::milliseconds(100));
+                            simulator.graphics.update();
                         }
                     }
 
@@ -820,10 +851,11 @@ int main(int argc, char **argv) {
 
             // Update graphics
             if (simulator.graphics.needsGraphics()) {
-                    simulator.graphics.renderScreen();
-                    simulator.graphics.window.clear();
-                    simulator.graphics.window.draw(simulator.graphics.screenSprite);
-                    simulator.graphics.window.display();
+                    // simulator.graphics.renderScreen();
+                    // simulator.graphics.window.clear();
+                    // simulator.graphics.window.draw(simulator.graphics.screenSprite);
+                    // simulator.graphics.window.display();
+                    simulator.graphics.update();
                     sf::sleep(sf::milliseconds(16)); // ~60 FPS
                 }
         }
@@ -869,10 +901,11 @@ int main(int argc, char **argv) {
 
             // update graphics
             if (simulator.graphics.needsGraphics()) {
-                simulator.graphics.renderScreen();
-                simulator.graphics.window.clear();
-                simulator.graphics.window.draw(simulator.graphics.screenSprite);
-                simulator.graphics.window.display();
+                // simulator.graphics.renderScreen();
+                // simulator.graphics.window.clear();
+                // simulator.graphics.window.draw(simulator.graphics.screenSprite);
+                // simulator.graphics.window.display();
+                simulator.graphics.update();
             }
 
             // If the simulation is still running, signal readiness for the next step
@@ -882,6 +915,6 @@ int main(int argc, char **argv) {
         std::cout << "Interactive simulation finished." << std::endl;
     }
 
-    simulator.graphics.cleanup();
+    // simulator.graphics.cleanup();
     return 0;
 }

@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(z16sim
     z16sim.cpp
     graphics.cpp
+    Memory.cpp
 )
 
 target_link_libraries(z16sim PRIVATE 
