@@ -1080,7 +1080,7 @@ class ZX16Assembler:
             encoding = ((imm & 0x7F) << 9) | (rd << 6) | (func3 << 3) | InstructionFormat.I_TYPE.value
             return encoding
         
-        # Shift instructions (special I-Type)
+                # Shift instructions (special I-Type)
         elif mnemonic in parser.shift_instructions:
             if len(operands) < 2:
                 raise SyntaxError(f"Shift instruction {mnemonic} requires 2 operands")
@@ -1097,6 +1097,7 @@ class ZX16Assembler:
             
             encoding = (imm7 << 9) | (rd << 6) | (func3 << 3) | InstructionFormat.I_TYPE.value
             return encoding
+        
         
         # B-Type instructions
         elif mnemonic in parser.b_type_instructions:

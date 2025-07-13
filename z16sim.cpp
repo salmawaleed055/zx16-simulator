@@ -193,8 +193,9 @@ void z16sim::disassemble(uint16_t inst, uint16_t current_pc, char *buf, size_t b
                 snprintf(temp_instr_str, sizeof(temp_instr_str), "sltiu %s, %u", regNames[rd_rs1], usimm);
             }
             else if(funct3 == 0x3) { // Shift immediates
-                uint8_t shamt = imm & 0x7;
-                uint8_t shift_type_bits = (imm >> 3) & 0x3;
+                uint8_t imm7 = (inst >> 9) & 0x7F;
+                uint8_t shamt = imm7 & 0x7;
+                uint8_t shift_type_bits = (imm7 >> 4) & 0x7;
                 if (shift_type_bits == 0x1)
                     snprintf(temp_instr_str, sizeof(temp_instr_str), "slli %s, %d", regNames[rd_rs1], shamt);
                 else if (shift_type_bits == 0x2)
@@ -407,12 +408,12 @@ int z16sim::executeInstruction(uint16_t inst) {
             else if(funct3 == 0x3) // Shift immediates
             {
                 uint8_t shamt = imm7 & 0x7; // Shift amount (3 bits for 16-bit shift)
-                uint8_t shift_type_bits = (imm7 >> 3) & 0x3; // The two most significant bits of the immediate control shift type
+                uint8_t shift_type_bits = (imm7 >> 4) & 0x7; // The two most significant bits of the immediate control shift type
                 if (shift_type_bits == 0x1) // 01b for SLLI
                     regs[rd_rs1]= regs[rd_rs1] << shamt;
                 else if (shift_type_bits == 0x2)// 10b for SRLI
                     regs[rd_rs1]= regs[rd_rs1] >> shamt;
-                else if (shift_type_bits == 0x3) // 11b for SRAI
+                else if (shift_type_bits == 0x4) // 11b for SRAI
                     regs[rd_rs1]= (uint16_t)(((int16_t)regs[rd_rs1]) >> shamt);
                 else {
                     std::cerr << "Unknown I-Type Shift instruction at PC 0x" << std::hex << pc << std::dec << "\n";
@@ -610,52 +611,6 @@ int z16sim::executeInstruction(uint16_t inst) {
                 regs[rd] = pc + (imm << 7); // Add PC-relative immediate
             break;
         }
-        // case 0x7: { // System instruction (ecall)
-        //     uint16_t svc = (inst >> 6) & 0x3FF; // (10-bit system-call number)
-        //     uint8_t func3 = (inst >> 3) & 0x7; // 000
-        //     if (func3 == 0x0) {
-        //         if (svc == 0x0) // Print character syscall
-        //             printf("%c", regs[6] & 0xFF); // a0 is in regs[6]
-        //         else if (svc == 0x1) // Read char into a0
-        //             regs[6] = getchar() & 0xFF;
-        //         else if (svc == 0x2) // Print string syscall
-        //             printf("%s", (char*)&memory[regs[6]]);
-        //         else if (svc == 0x3) // # Print decimal
-        //             printf("%d", (int16_t)regs[6]);
-        //         else if (svc == 4) { // Play Tone
-        //             std::cout << "[Tone] Freq: " << regs[6] << " Hz, Duration: " << regs[7] << " ms\n";
-        //         }
-        //         else if (svc == 5) { // Set Audio Volume
-        //             std::cout << "[Audio] Set volume to " << regs[6] << "\n";
-        //         }
-        //         else if (svc == 6) { // Stop Audio Playback
-        //             std::cout << "[Audio] Stop playback\n";
-        //         }
-        //         else if (svc == 7) { // Read Keyboard
-        //             regs[6] = 0;
-        //             regs[7] = 0;
-        //             // For real implementation, poll input here
-        //         }
-        //         else if (svc == 8) { // Registers Dump
-        //             dumpRegisters();
-        //         }
-        //         else if (svc == 9) { // Memory Dump
-        //             uint16_t addr = regs[6];
-        //             uint16_t len = regs[7];
-        //             std::cout << "--- Memory Dump ---\n";
-        //             for (uint16_t i = 0; i < len; ++i) {
-        //                 if (i % 16 == 0) std::cout << "\n0x" << std::hex << (addr + i) << ": ";
-        //                 std::cout << std::setw(2) << std::setfill('0') << std::hex << (int)memory[addr + i] << " ";
-        //             }
-        //             std::cout << std::dec << "\n-------------------\n";
-        //         }
-        //         else if (svc == 0x3FF) // Exit program syscall
-        //             return 0;
-
-        //         else
-        //             printf("Unknown ecall: 0x%03X\n", svc);
-        //         break;
-        //     }
         case 0x7: { // System instruction (ecall)
             uint16_t svc = (inst >> 6) & 0x3FF; // (10-bit system-call number)
             uint8_t func3 = (inst >> 3) & 0x7; // 000

@@ -107,7 +107,10 @@ init_graphics:
 
 game_loop:
     # Handle input for player 1 (W/S)
-        li a0, KEY_W
+        # li a0, KEY_W  #119
+        li a0, 0
+        addi a0, 63
+        addi a0, 56
         ecall 7
 
         bz a1, check_s
@@ -119,7 +122,11 @@ game_loop:
         j update_display
 
         check_s:
-            li a0, KEY_S
+            addi x0, 0
+            # li a0, KEY_S # 115
+            li a0, 0
+            addi a0, 63
+            addi a0, 52
             ecall 7
 
             bz a1, update_display
@@ -132,12 +139,13 @@ game_loop:
 
         update_display:
             # clear screen 
+            addi x0, 0
             li t0, TILE_MAP_BASE
             li s1, SCREEN_WIDTH
             li s0, SCREEN_HEIGHT
 
             mv t1, s1
-            slli t1, 4
+            slli t1, 4 ###
 
             sub t1, s1
             mv s1, t1
@@ -149,11 +157,14 @@ game_loop:
                 sb t1, 0(t0)
                 addi t0, 1
                 addi s1, -1
-                bnz s1, clear_loop
+
+                li ra, 0
+                bne s1, ra, clear_loop
+                # bnz s1, clear_loop
 
 
             # Draw paddle 1
-            lw a0, 0(P1_X_ADDR)
+            lw a0, 0(P1_X_ADDR) ###
             li a1, TOP_PADDLE_Y
             li s1, PADDLE_TILE
 
@@ -161,7 +172,7 @@ game_loop:
 
             mv t0, a1
             mv t1, a1
-            slli t0, 4
+            slli t0, 4 ## prints as srli.. value wrong?
             slli t1, 2
             add t0, t1
 
@@ -180,7 +191,10 @@ game_loop:
                 sb s1, 0(t0)
                 addi t0, 1
                 addi s0, -1
-                bnz s0, draw_p1
+
+                li ra, 0
+                bne s0, ra, draw_p1
+                # bnz s0, draw_p1
 
 
             j game_loop
