@@ -25,8 +25,8 @@ subroutine:
 
 test_failed:
     clr a0
-    ecall 3
+    ecall 10
 
 test_passed:
     li a0, 1
-    ecall 3
+    ecall 10

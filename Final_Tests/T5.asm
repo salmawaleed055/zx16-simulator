@@ -37,7 +37,7 @@ main:
 
     # Exit
     clr x1
-    ecall 3
+    ecall 10
 
 # Recursive Power function
 # Input: x1 = base, x3 = exponent (changed from x2 to avoid stack pointer conflict)

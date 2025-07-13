@@ -74,9 +74,9 @@ forward_test:
     j test_failed
 
 test_passed:
-    li a0, 1            # Success code
-    ecall 3
+    li x6, 1            # Success code
+    ecall 10
 
 test_failed:
-    clr a0              # Failure code
-    ecall 3
+    clr x6              # Failure code
+    ecall 10

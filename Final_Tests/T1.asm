@@ -67,7 +67,7 @@ main:
 
     # Exit
     clr a0
-    ecall 3
+    ecall 10
 
 test_function:
     # Simple function that increments x7

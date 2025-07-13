@@ -1195,7 +1195,7 @@ class ZX16Assembler:
             if isinstance(target, str):
                 raise SyntaxError(f"Unresolved symbol in jump target: {target}")
 
-            offset = target - (self.current_address)
+            offset = target - (self.current_address )
             if offset < -1024 or offset > 1020 or offset % 2 != 0:
                 raise SyntaxError(f"Jump offset out of range or not word-aligned: {offset}")
 
