@@ -41,9 +41,9 @@ main:
             addi t1, 1
             j loop2
 
-        
+
         exit:
             ecall 0x3FF
 
-    
+
 

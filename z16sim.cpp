@@ -11,9 +11,42 @@
 #include <vector>
 #include <cmath>
 #include <conio.h>
+#include <thread>
+#include <memory>
+#include <unistd.h>
+#include <fcntl.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
-// At the top of your file or in your class
 sf::Music music;
+
+
+void playToneAsync(float frequency, int durationMs) {
+    std::thread([frequency, durationMs]() {
+        const int sampleRate = 44100;
+        int sampleCount = sampleRate * durationMs / 1000;
+        std::vector<sf::Int16> samples(sampleCount);
+
+        for (int i = 0; i < sampleCount; ++i) {
+            samples[i] = 30000 * std::sin(2 * 3.14159265f * frequency * i / sampleRate);
+        }
+
+        sf::SoundBuffer buffer;
+        if (!buffer.loadFromSamples(samples.data(), sampleCount, 1, sampleRate)) {
+            std::cerr << "Failed to load sound buffer" << std::endl;
+            return;
+        }
+
+        sf::Sound sound(buffer);
+        sound.play();
+
+        // Wait until sound finishes playing
+        while (sound.getStatus() == sf::Sound::Playing) {
+            sf::sleep(sf::milliseconds(10));
+        }
+    }).detach(); // Detach thread to run independently
+}
 
 void playTone(float frequency, int durationMs) {
     const int sampleRate = 44100;
@@ -647,50 +680,61 @@ int z16sim::executeInstruction(uint16_t inst) {
                     printf("%s", (char*)&memory[regs[6]]);
                 else if (svc == 0x3) // # Print decimal
                     printf("%d", (int16_t)regs[6]);
-                else if (svc == 0x4) { // Play Tone
+                if (svc == 0x4) { // Print decimal value in a0
+                    std::cout << (int16_t)regs[6] << std::endl;
+                    break;
+                }
+                else if (svc == 0x5) { // Play Tone
                     uint16_t freq = regs[6];      // a0
                     uint16_t duration = regs[7];  // a1
 
-                    // Defensive checks
-                    if (freq < 20 || freq > 20000) { // Human hearing range
+                    if (freq < 20 || freq > 20000) {
                         std::cout << "Invalid frequency: " << freq << " Hz (must be 20-20000)\n";
                         break;
                     }
-                    if (duration == 0 || duration > 5000) { // 0 < duration <= 5 seconds
+                    if (duration == 0 || duration > 5000) {
                         std::cout << "Invalid duration: " << duration << " ms (must be 1-5000)\n";
                         break;
                     }
-                     playTone(static_cast<float>(regs[6]), static_cast<int>(regs[7]));
 
+                    playToneAsync(static_cast<float>(freq), static_cast<int>(duration));
                     break;
                 }
+
+
+
 
 
                 else if (svc == 0x5) { // Set Audio Volume
                     uint8_t volume = regs[6] & 0xFF; // a0
                     float sfmlVolume = (volume / 255.0f) * 100.0f;
                     std::cout << "[Audio] Set volume to " << (int)volume << " (SFML: " << sfmlVolume << ")\n";
-                    music.setVolume(10); // music must be a persistent sf::Music or sf::Sound object
+                    music.setVolume(10);
                 }
                 else if (svc == 0x6) { // Stop Audio Playback
                     std::cout << "[Audio] Stop playback\n";
                 }
-                else if (svc == 0x7) { // Read Keyboard
+                else if (svc == 7) {
 #ifdef _WIN32
-                    if (_kbhit()) {
-                        int ch = _getch();
-                        regs[6] = ch; // a0 = key code
-                        regs[7] = 1;  // a1 = key pressed
-                    } else {
-                        regs[6] = 0;
-                        regs[7] = 0;
+                    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+                    INPUT_RECORD inputRecord;
+                    DWORD read;
+
+                    while (true) {
+                        ReadConsoleInput(hStdin, &inputRecord, 1, &read);
+                        if (inputRecord.EventType == KEY_EVENT && inputRecord.Event.KeyEvent.bKeyDown) {
+                            regs[6] = inputRecord.Event.KeyEvent.uChar.AsciiChar;
+                            regs[7] = 1;
+                            break;  // exit loop once key pressed
+                        }
                     }
 #else
-                    // Fallback for non-Windows (see below)
                     regs[6] = 0;
                     regs[7] = 0;
 #endif
                 }
+
+
                 else if (svc == 0x8) { // Registers Dump
                     dumpRegisters();
                 }
@@ -721,7 +765,7 @@ int z16sim::executeInstruction(uint16_t inst) {
     }
 
     if(!pcUpdated)
-        pc += 2; // Default: move to next instruction (if PC wasn't updated by a jump/branch)
+        pc += 2;
 
     return 1; // Continue simulation
 }
@@ -849,19 +893,19 @@ int main(int argc, char **argv) {
     } 
 
     else {
-        // --- Interactive/Step-by-Step Mode ---
+
         simulator.setDebug(true);
 
         std::cout << "Starting interactive simulation." << std::endl;
         simulator.dumpRegisters(); // Print initial state of registers
 
-        // After initial setup and printing the initial state, signal readiness
+
         std::cout << "READY_FOR_STEP" << std::endl;
         std::cout.flush();
 
         std::string line_input;
         while(true) {
-            // Read input from stdin. This will block until the backend sends a newline or 'q'.
+
             if (!std::getline(std::cin, line_input)) {
                 // If getline fails (e.g., stdin is closed by the backend), exit
                 std::cerr << "Input stream closed unexpectedly. Exiting interactive mode." << std::endl;
