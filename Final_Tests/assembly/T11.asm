@@ -1,0 +1,31 @@
+    .text
+    .org 0x0000
+
+main:
+    li x1, 12
+    li x2, 5
+    add x1, x2
+    sub x3, x2
+
+    and x3, x4
+    or  x3, x4
+    xor x3, x4
+
+    # Store x3 (word) to memory at address mem_loc
+    la x2, mem_loc        # x2 = address of mem_loc
+    sw x3, 0(x2)          # Store x3 at mem_loc
+
+    # Clear x3, then load back from memory
+    clr x3
+    lw x3, 0(x2)          # x3 = value loaded from mem_loc
+
+    # Store x4 (byte) to mem_loc+2, then load it back to x4
+    sb x4, 2(x2)          # Store low byte of x4 at mem_loc+2
+    clr x4
+    lb x4, 2(x2)          # x4 = value loaded from mem_loc+2 (signed)
+
+    ecall 10              # Exit
+
+    .data
+mem_loc:
+    .word 0x0000
