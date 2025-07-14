@@ -6,7 +6,6 @@ main:
     LI x4, -1         # White (0xFF)
     SB x4, 1(x3)      # palette[1] = white
 
-    # === Create White Block Tile (Tile 1) ===
     LUI x3, 484       # 0xF200
     ADDI x3, 63       # Skip to tile 1
     ADDI x3, 63
@@ -19,12 +18,11 @@ main:
 
     LI x4, 1          # White tile
 
-    # LEFT PADDLE - Column 0, Rows 3-8 (6 tiles tall)
+
     LUI x3, 480       # Reset to tile map
     ADDI x3, 60       # Row 3: 3*20 = 60
     ADDI x3, 0        # Column 0 (leftmost)
 
-    # Draw left paddle (6 tiles vertical)
     SB x4, 0(x3)      # Row 3
     ADDI x3, 20       # Next row
     SB x4, 0(x3)      # Row 4
@@ -37,7 +35,6 @@ main:
     ADDI x3, 20       # Next row
     SB x4, 0(x3)      # Row 8
 
-    # RIGHT PADDLE - Column 19, Rows 3-8 (6 tiles tall)
     LUI x3, 480       # Reset to tile map
     ADDI x3, 60       # Row 3: 3*20 = 60
     ADDI x3, 19       # Column 19 (rightmost)
@@ -60,7 +57,6 @@ fill_tile:
     ADDI x5, -1
     BNZ x5, fill_tile
 
-    # === Clear screen ===
     LUI x3, 480       # 0xF000 (tile map)
     LI x5, 0          # Black tile
     LI x4, 300        # Clear 300 tiles
@@ -70,7 +66,6 @@ clear_screen:
     ADDI x4, -1
     BNZ x4, clear_screen
 
-    # === Initialize game variables ===
     LI x0, 10         # Ball X position
     LI x1, 6          # Ball Y position
     LI x2, 1          # Ball X velocity
@@ -78,7 +73,6 @@ clear_screen:
     LI x6, 0          # Left score
     LI x7, 0          # Right score
 
-    # === Draw initial left paddle ===
     LI x4, 1          # White tile
     LUI x5, 480       # 0xF000
     ADDI x5, 60       # Row 3
@@ -120,6 +114,9 @@ clear_screen:
 # === MAIN GAME LOOP ===
 g
 game_loop:
+    li x6, 440      # Frequency for sound
+   li x7, 100      # Duration
+   ecall 4         # SYS_TONE
     # === Check for keyboard input ===
     ECALL 7           # Read keyboard - key in x6 (a0), pressed flag in x7 (a1)
 

@@ -802,6 +802,9 @@ SB x4, 3(x3)
     LI x4, 0          # Black tile
 
 game_input_loop:
+ li x6, 440      # Frequency for sound
+   li x7, 100      # Duration
+   ecall 4         # SYS_TONE
     # === Check for keyboard input ===
     ECALL 7           # Read keyboard - key in x6 (a0), pressed flag in x7 (a1)
 
@@ -1503,6 +1506,32 @@ end_demo:
 
 
  finish:
+   LUI x3, 480       # 0xF000 (tile map)
+     LI x4, 1          # White tile (tile 1)
+
+     # Create visible pattern by placing white tiles
+     # First, clear some area
+     LI x5, 0          # Black tile
+     SB x5, 0(x3)
+     SB x5, 1(x3)
+     SB x5, 2(x3)
+     SB x5, 3(x3)
+     SB x5, 4(x3)
+     SB x5, 5(x3)
+     SB x5, 6(x3)
+     SB x5, 7(x3)
+
+     # Move to next row
+     ADDI x3, 20
+     SB x5, 0(x3)
+     SB x5, 1(x3)
+     SB x5, 2(x3)
+     SB x5, 3(x3)
+     SB x5, 4(x3)
+     SB x5, 5(x3)
+     SB x5, 6(x3)
+     SB x5, 7(x3)
+
      NOP
      NOP
      NOP

@@ -9,7 +9,7 @@
 // #include <chrono>   // For std::chrono
 // #include <SFML/Audio.hpp>
 #include <cmath>
-
+float globalVolume = 50.0f;
 // sf::Music music;
 
 // void playTone(float frequency, int durationMs) {
@@ -643,32 +643,44 @@ int z16sim::executeInstruction(uint16_t inst) {
                 else if (svc == 0x3) // # Print decimal
                     printf("%d", (int16_t)regs[6]);
                 else if (svc == 0x4) { // Play Tone
-                    uint16_t freq = regs[6];      // a0
-                    uint16_t duration = regs[7];  // a1
+                    uint16_t frequency = regs[6];
+                    uint16_t duration_ms = regs[7];
 
-                    // Defensive checks
-                    if (freq < 20 || freq > 20000) { // Human hearing range
-                        std::cout << "Invalid frequency: " << freq << " Hz (must be 20-20000)\n";
+                    // Validate inputs
+                    if (frequency < 20 || frequency > 20000) {
+                        std::cout << "Invalid frequency: " << frequency << " Hz\n";
                         break;
                     }
-                    if (duration == 0 || duration > 5000) { // 0 < duration <= 5 seconds
-                        std::cout << "Invalid duration: " << duration << " ms (must be 1-5000)\n";
-                        break;
-                    }
-                    //  playTone(static_cast<float>(regs[6]), static_cast<int>(regs[7]));
 
+                    float duration_sec = duration_ms / 1000.0f;
+                    float volume = globalVolume / 100.0f; // Assuming globalVolume is 0-100
+
+                    std::string cmd = "play -n synth " + std::to_string(duration_sec) +
+                                     " sine " + std::to_string(frequency) +
+                                     " vol " + std::to_string(volume) + " > /dev/null 2>&1";
+
+                    std::cout << "Playing tone: " << frequency << "Hz for " << duration_ms << "ms\n";
+                    system(cmd.c_str());
                     break;
+
                 }
 
 
                 else if (svc == 0x5) { // Set Audio Volume
-                    uint8_t volume = regs[6] & 0xFF; // a0
-                    float sfmlVolume = (volume / 255.0f) * 100.0f;
-                    std::cout << "[Audio] Set volume to " << (int)volume << " (SFML: " << sfmlVolume << ")\n";
-                    // music.setVolume(10); // music must be a persistent sf::Music or sf::Sound object
+                    uint16_t volume = regs[6];
+                    if (volume > 255) volume = 255;
+
+                    globalVolume = (volume / 255.0f) * 100.0f;
+                    std::cout << "Audio volume set to: " << volume << "/255\n";
+                    break;
+
                 }
                 else if (svc == 0x6) { // Stop Audio Playback
-                    std::cout << "[Audio] Stop playback\n";
+                    std::cout << "Audio playback stopped\n";
+                    // Kill any running play processes
+                    system("pkill -f 'play -n synth' > /dev/null 2>&1");
+                    break;
+
                 }
                 else if (svc == 0x7) { // Read Keyboard
                     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) {
