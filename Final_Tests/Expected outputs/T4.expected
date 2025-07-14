@@ -1,0 +1,12 @@
+    li x1, 0
+
+    # Test JAL (jump and link)
+    clr x2
+    jal x1, subroutine  # Call subroutine, return address in x1
+        inc x2              # Increment x2
+        jr x1                 # Return (JR x1)
+
+    li x3, 1
+
+    li a0, 1
+    ecall 10

@@ -40,10 +40,6 @@ main:
     ecall 10
 
 # Recursive Power function
-# Input: x1 = base, x3 = exponent (changed from x2 to avoid stack pointer conflict)
-# Output: x1 = base^exponent
-# Uses: x4, x5, x6, x7 for temporary storage
-# x2 is reserved for stack pointer
 power:
     # Base case: if exponent == 0, return 1
     nop

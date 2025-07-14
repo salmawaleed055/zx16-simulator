@@ -1,0 +1,21 @@
+Test 1: Print String (Service 3)
+
+Test 2: Read String (Service 1)
+
+Test 3: Print the string we just read
+
+Test 4: Read Integer (Service 2)
+
+Test 5: Set Audio Volume (Service 5)
+
+Test 6: Play Tone (Service 4)
+
+Test 7: Stop Audio (Service 6)
+
+Test 8: Read Keyboard (Service 7)
+
+Test 9: Memory Dump (Service 9)
+
+Test 10: Registers Dump (Service 8)
+
+Test 11: Exit Program (Service 10)

@@ -1,0 +1,10 @@
+simple branch test
+
+    li x1, 5
+    li x2, 5
+    beq x1, x2, success   # Branch taken
+        nop
+        li x6, 1
+    clr x6                # Fail: x6 = 0
+    ecall 10
+

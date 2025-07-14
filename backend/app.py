@@ -1,673 +1,342 @@
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import subprocess
+import threading
+import queue
 import os
 import tempfile
-import platform
-import threading
 import time
-# import select # <--- This import should be removed if not used, or only used conditionally
-import sys
-import signal
-import atexit
-import shutil
+import json
+import base64
+import struct
+from datetime import datetime
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
-
-active_simulations = {}
 process_id_counter = 0
-process_id_lock = threading.Lock()
+CORS(app)
 
-def cleanup_processes():
-    """Clean up all active processes on server shutdown"""
-    for process_id, sim_info in list(active_simulations.items()):
-        try:
-            process = sim_info['process']
-            if process.poll() is None:
-                print(f"Cleaning up lingering process {process_id}...")
-                process.terminate()
-                try:
-                    process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-            if os.path.exists(sim_info['temp_path']):
-                os.unlink(sim_info['temp_path'])
-            del active_simulations[process_id]
-        except Exception as e:
-            print(f"Error during cleanup for process {process_id}: {e}")
+class Z16SimulatorManager:
+    def __init__(self):
+        self.active_sessions = {}
+        self.session_lock = threading.Lock()
 
-atexit.register(cleanup_processes)
+    def create_session(self, bin_file_path, interactive=True):
+        """Create a new simulation session"""
+        session_id = str(int(time.time() * 1000))  # Use timestamp as ID
 
-def check_compiler():
-    """Check if g++ compiler is available"""
-    try:
-        # Use shell=True for windows to help find g++.exe in PATH if not directly found
-        result = subprocess.run(['g++', '--version'], capture_output=True, timeout=5, shell=platform.system() == 'Windows')
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return False
-    except Exception as e:
-        print(f"Error checking compiler: {e}")
-        return False
+        with self.session_lock:
+            self.active_sessions[session_id] = {
+                'process': None,
+                'output': [],
+                'queue': queue.Queue(),
+                'is_running': False,
+                'bin_file': bin_file_path,
+                'interactive': interactive,
+                'graphics_data': None,
+                'last_graphics_update': None
+            }
 
-def compile_simulator():
-    """Compile the z16sim.cpp file if it exists and executable doesn't exist"""
-    cpp_file = 'z16sim.cpp'
+        return session_id
 
-    if platform.system() == 'Windows':
-        executable = 'z16sim.exe'
-        compile_cmd = ['g++', '-o', executable, cpp_file]
-    else:
-        executable = 'z16sim'
-        compile_cmd = ['g++', '-o', executable, cpp_file]
+    def start_simulation(self, session_id):
+        """Start the Z16 simulator process"""
+        if session_id not in self.active_sessions:
+            return False, "Session not found"
 
-    if not os.path.exists(cpp_file):
-        return False, f"Source file {cpp_file} not found"
+        session = self.active_sessions[session_id]
 
-    if not check_compiler():
-        return False, "g++ compiler not found. Please install a C++ compiler."
+        # Build command - add headless flag to prevent SFML window
+        cmd = ['./z16sim']
+        if session['interactive']:
+            cmd.append('-i')
+        cmd.append(session['bin_file'])
 
-    if os.path.exists(executable):
-        try:
-            cpp_mtime = os.path.getmtime(cpp_file)
-            exe_mtime = os.path.getmtime(executable)
-            if exe_mtime > cpp_mtime:
-                return True, f"Executable {executable} is up to date"
-        except Exception as e:
-            print(f"Warning: Could not get mtime for {executable} or {cpp_file}: {e}")
-            pass
-
-    try:
-        print(f"Compiling {cpp_file}...")
-        # Use shell=True on Windows for robustness if g++ path isn't straightforward
-        result = subprocess.run(compile_cmd, capture_output=True, text=True, timeout=30, shell=platform.system() == 'Windows')
-
-        if result.returncode == 0:
-            if platform.system() != 'Windows':
-                os.chmod(executable, 0o755)
-            print(f"Compilation successful: {executable}")
-            return True, f"Successfully compiled {executable}"
-        else:
-            print(f"Compilation failed: {result.stderr}")
-            return False, f"Compilation failed: {result.stderr}"
-
-    except subprocess.TimeoutExpired:
-        print("Compilation timed out")
-        return False, "Compilation timed out"
-    except FileNotFoundError:
-        print("g++ compiler not found during compilation attempt.")
-        return False, "g++ compiler not found. Please install a C++ compiler."
-    except Exception as e:
-        print(f"Compilation error: {str(e)}")
-        return False, f"Compilation error: {str(e)}"
-
-def check_executable():
-    """Check if the simulator executable exists and return its absolute path."""
-    if platform.system() == 'Windows':
-        executable_name = 'z16sim.exe'
-    else:
-        executable_name = 'z16sim'
-
-    # Check current directory first
-    if os.path.exists(executable_name):
-        abs_path = os.path.abspath(executable_name)
-        if platform.system() != 'Windows':
-            if os.access(abs_path, os.X_OK):
-                return abs_path, "Executable found and ready"
-            else:
-                return None, "Executable found but not executable (permissions issue). Try `chmod +x z16sim`."
-        else:
-            return abs_path, "Executable found and ready"
-
-    # Also search PATH
-    path_executable = shutil.which(executable_name)
-    if path_executable:
-        if platform.system() != 'Windows':
-            if os.access(path_executable, os.X_OK):
-                return os.path.abspath(path_executable), "Executable found in PATH and ready"
-            else:
-                return None, "Executable found in PATH but not executable (permissions issue)."
-        else:
-            return os.path.abspath(path_executable), "Executable found in PATH and ready"
-
-    return None, "Executable not found"
-
-def read_until_ready(process, timeout=10):
-    """
-    Read from process stdout until we see "READY_FOR_STEP", EOF, or timeout.
-    Returns collected output lines and a boolean indicating if "READY_FOR_STEP" was found.
-
-    This function relies on the subprocess printing line-by-line and flushing its stdout.
-    """
-    output_buffer = []
-    start_time = time.time()
-    ready_marker_found = False
-
-    while time.time() - start_time < timeout:
-        if process.poll() is not None:
-            # Process has terminated, read any remaining output
-            try:
-                # Read all remaining output if process exited
-                remaining_output = process.stdout.read()
-                if remaining_output:
-                    # Split by lines and append
-                    for line in remaining_output.strip().splitlines():
-                        output_buffer.append(line)
-            except ValueError: # stdin/stdout/stderr are closed
-                pass
-            break
+        # Set environment variable to run headless (no SFML window)
+        env = os.environ.copy()
+        env['DISPLAY'] = ':99'  # Use virtual display
 
         try:
-            line = process.stdout.readline() # This will block until a newline or EOF
-            if line:
-                line = line.strip()
-                if line == "READY_FOR_STEP":
-                    ready_marker_found = True
-                    break
-                output_buffer.append(line)
-            else: # EOF reached, process might have ended
-                # Give a brief moment for process to fully terminate
-                time.sleep(0.01)
-                if process.poll() is not None: # Confirm termination
-                    break
-                else: # No line, but process still alive, wait a bit
-                    time.sleep(0.05)
+            session['process'] = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                bufsize=1,
+                universal_newlines=True,
+                env=env
+            )
+
+            # Start reader thread
+            threading.Thread(
+                target=self._sim_reader_thread,
+                args=(session_id,),
+                daemon=True
+            ).start()
+
+            session['is_running'] = True
+            return True, "Simulation started"
+
         except Exception as e:
-            # This can catch BrokenPipeError, ValueError if stream is closed, etc.
-            print(f"Error reading from process stdout (might be closed): {e}")
-            break
+            return False, f"Error starting simulator: {e}"
 
-        # Small sleep to prevent busy-waiting if readline() isn't producing data rapidly
-        time.sleep(0.01)
+    def _sim_reader_thread(self, session_id):
+        """Read simulator output in separate thread"""
+        session = self.active_sessions[session_id]
+        process = session['process']
+        output_list = session['output']
+        q = session['queue']
 
-        # After the loop, attempt to read any final remaining data that might have buffered
-    # This is a bit tricky with line-buffered, but important if process terminates
-    # right after the marker.
-    try:
-        # Read any remaining data that's immediately available without blocking
-        # This loop will quickly drain anything left after the main loop finishes.
         while True:
-            # On Unix-like systems, we can use select for non-blocking read
-            if platform.system() != 'Windows':
-                import select # Import select here to ensure it's only used where applicable
-                rlist, _, _ = select.select([process.stdout], [], [], 0.001) # Very short timeout
-                if rlist:
-                    line = process.stdout.readline()
-                    if line:
-                        line = line.strip()
-                        if line == "READY_FOR_STEP":
-                            ready_marker_found = True
-                        else:
-                            output_buffer.append(line)
-                    else: # EOF
-                        break
-                else: # No more data for now
-                    break
-            else: # On Windows, just try readline one more time and break if empty
+            try:
                 line = process.stdout.readline()
+                if not line:
+                    break
+
+                line = line.strip()
                 if line:
-                    line = line.strip()
-                    if line == "READY_FOR_STEP":
-                        ready_marker_found = True
-                    else:
-                        output_buffer.append(line)
+                    output_list.append(line)
+
+                    # Check for graphics memory updates
+                    if "Graphics memory updated" in line:
+                        self._capture_graphics_state(session_id)
+
+                    # Signal when simulator is ready for next step
+                    if "READY_FOR_STEP" in line:
+                        q.put("READY")
+                    elif "Simulation halted" in line or "Program execution completed" in line:
+                        q.put("HALTED")
+                        session['is_running'] = False
+
+            except Exception as e:
+                print(f"Error reading simulator output: {e}")
+                break
+
+    def _capture_graphics_state(self, session_id):
+        """Capture current graphics state by reading simulator memory"""
+        session = self.active_sessions[session_id]
+
+        # For now, we'll create a mock graphics state
+        # In a real implementation, you'd read from the simulator's memory
+        graphics_data = {
+            'timestamp': datetime.now().isoformat(),
+            'width': 320,  # Adjust based on your graphics resolution
+            'height': 240,
+            'tile_width': 8,
+            'tile_height': 8,
+            'palette': self._get_default_palette(),
+            'framebuffer': self._extract_framebuffer(session_id),
+            'needs_update': True
+        }
+
+        session['graphics_data'] = graphics_data
+        session['last_graphics_update'] = time.time()
+
+    def _get_default_palette(self):
+        """Get default color palette"""
+        return [
+            '#000000', '#FFFFFF', '#FF0000', '#00FF00',
+            '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+            '#800000', '#008000', '#000080', '#808000',
+            '#800080', '#008080', '#808080', '#C0C0C0'
+        ]
+
+    def _extract_framebuffer(self, session_id):
+        """Extract framebuffer data from simulator"""
+        # This is a mock implementation
+        # In reality, you'd need to modify your C++ simulator to output graphics data
+        width, height = 320, 240
+
+        # Create a simple test pattern
+        framebuffer = []
+        for y in range(height):
+            row = []
+            for x in range(width):
+                # Simple gradient pattern
+                color_index = ((x + y) // 20) % 16
+                row.append(color_index)
+            framebuffer.append(row)
+
+        return framebuffer
+
+    def get_graphics_data(self, session_id):
+        """Get current graphics state"""
+        if session_id not in self.active_sessions:
+            return None
+
+        session = self.active_sessions[session_id]
+        return session.get('graphics_data')
+
+    def step_simulation(self, session_id):
+        """Execute one simulation step"""
+        if session_id not in self.active_sessions:
+            return False, "Session not found"
+
+        session = self.active_sessions[session_id]
+
+        if not session['process'] or session['process'].poll() is not None:
+            return False, "No simulation running"
+
+        try:
+            session['process'].stdin.write("\n")
+            session['process'].stdin.flush()
+
+            # Wait for response
+            try:
+                result = session['queue'].get(timeout=5)
+
+                # Capture graphics state after each step
+                self._capture_graphics_state(session_id)
+
+                if result == "HALTED":
+                    session['is_running'] = False
+                    return True, "Simulation halted"
                 else:
-                    break # EOF or no more data
-                time.sleep(0.001) # Small pause to yield control
+                    return True, "Step completed"
+            except queue.Empty:
+                return False, "Timeout waiting for simulator response"
 
-    except Exception as e:
-        print(f"Error during final read_until_ready drain: {e}")
+        except Exception as e:
+            return False, f"Error stepping simulation: {e}"
 
-    return output_buffer, ready_marker_found
-
-@app.route('/compile', methods=['POST'])
-def compile_endpoint():
-    try:
-        success, message = compile_simulator()
-        if success:
-            return jsonify({'status': 'success', 'message': message}), 200
-        else:
-            return jsonify({'status': 'error', 'message': message}), 500
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': f'Compilation error: {str(e)}'}), 500
+# Global simulator manager
+simulator_manager = Z16SimulatorManager()
 
 @app.route('/simulate', methods=['POST'])
 def simulate():
-    global process_id_counter
-
+    """Handle binary file upload and simulation"""
     try:
         if 'binfile' not in request.files:
-            return jsonify({'error': 'No file uploaded'}), 400
+            return "❌ No file provided", 400
 
         file = request.files['binfile']
 
         if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
+            return "❌ No file selected", 400
 
-        executable_path, message = check_executable()
-        if not executable_path:
-            return jsonify({'error': f'Simulator not available: {message}'}), 500
+        # Save uploaded file
+        timestamp = str(int(time.time()))
+        filename = f"{timestamp}_{file.filename}"
+        filepath = os.path.join('uploads', filename)
 
-        simulation_mode = request.form.get('mode', 'full')
+        os.makedirs('uploads', exist_ok=True)
+        file.save(filepath)
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as temp_file:
-            file.save(temp_file.name)
-            temp_path = temp_file.name
+        # Create simulation session
+        session_id = simulator_manager.create_session(filepath, interactive=False)
 
+        # Start simulation
+        success, message = simulator_manager.start_simulation(session_id)
+
+        if not success:
+            return f"❌ {message}", 500
+
+        # Wait for simulation to complete
+        max_wait_time = 30
+        start_time = time.time()
+
+        while (time.time() - start_time) < max_wait_time:
+            session = simulator_manager.active_sessions[session_id]
+
+            if session['process'] and session['process'].poll() is not None:
+                break
+
+            if not session['is_running']:
+                break
+
+            time.sleep(0.1)
+
+        # Get output
+        output_lines = simulator_manager.get_full_output(session_id)
+
+        # Clean up
         try:
-            if simulation_mode == 'full':
-                print(f"Running full simulation: {executable_path} {temp_path}")
+            os.remove(filepath)
+        except:
+            pass
 
-                result = subprocess.run(
-                    [executable_path, temp_path],
-                    capture_output=True,
-                    text=True,
-                    timeout=120, # Increased timeout
-                    cwd=os.path.dirname(executable_path) or os.getcwd()
-                )
-
-                try:
-                    os.unlink(temp_path)
-                except Exception as e:
-                    print(f"Warning: Could not delete temp file {temp_path}: {e}")
-
-                if result.returncode == 0:
-                    return Response(result.stdout, mimetype='text/plain')
-                else:
-                    error_msg = result.stderr if result.stderr else "Unknown simulation error"
-                    print(f"Full simulation failed: {error_msg}")
-                    return jsonify({'error': f'Simulation failed: {error_msg}'}), 500
-
-            elif simulation_mode == 'step':
-                with process_id_lock:
-                    current_process_id = process_id_counter
-                    process_id_counter += 1
-
-                print(f"Starting step-by-step simulation: {executable_path} -i {temp_path}")
-
-                process = subprocess.Popen(
-                    [executable_path, '-i', temp_path],
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    bufsize=1,  # Line-buffered
-                    universal_newlines=True,
-                    cwd=os.path.dirname(executable_path) or os.getcwd()
-                )
-
-                active_simulations[current_process_id] = {
-                    'process': process,
-                    'temp_path': temp_path,
-                    'step_count': 0,
-                    'created_at': time.time()
-                }
-
-                # Read initial output until "READY_FOR_STEP" is found or process terminates
-                initial_output_lines, ready_marker_found = read_until_ready(process)
-
-                if process.poll() is not None:
-                    # Process terminated during startup
-                    stderr_output = ""
-                    try:
-                        stderr_output = process.stderr.read()
-                    except:
-                        pass
-
-                    try:
-                        os.unlink(temp_path)
-                    except Exception as e:
-                        print(f"Warning: Could not delete temp file {temp_path} during step startup cleanup: {e}")
-
-                    if current_process_id in active_simulations:
-                        del active_simulations[current_process_id]
-
-                    print(f"Step simulation process {current_process_id} terminated during startup. Return code: {process.returncode}. Stderr: {stderr_output}")
-                    return jsonify({
-                        'error': f'Simulation process terminated during startup. Return code: {process.returncode}. Output: {"\\n".join(initial_output_lines)}. Error: {stderr_output}'
-                    }), 500
-
-                if not ready_marker_found:
-                    print(f"Process {current_process_id} did not signal READY_FOR_STEP. Initial output: {initial_output_lines}")
-                    # Attempt to gracefully terminate and clean up
-                    try:
-                        process.stdin.write('q\n')
-                        process.stdin.flush()
-                        process.wait(timeout=2)
-                    except Exception as e:
-                        print(f"Error during graceful shutdown attempt for {current_process_id}: {e}")
-                        process.kill()
-
-                    try:
-                        os.unlink(temp_path)
-                    except Exception as e:
-                        print(f"Warning: Could not delete temp file {temp_path} after non-ready startup: {e}")
-
-                    if current_process_id in active_simulations:
-                        del active_simulations[current_process_id]
-
-                    return jsonify({
-                        'error': f'Simulator did not signal readiness after initial output. Initial output: {"\\n".join(initial_output_lines)}. Ensure your C++ simulator prints "READY_FOR_STEP" and flushes stdout.'
-                    }), 500
-
-                initial_output_str = "\n".join([line for line in initial_output_lines if line != "READY_FOR_STEP"])
-
-                return jsonify({
-                    'status': 'Simulation started in step-by-step mode',
-                    'process_id': current_process_id,
-                    'initial_output': initial_output_str
-                }), 200
-
-            else:
-                try:
-                    os.unlink(temp_path)
-                except Exception as e:
-                    print(f"Warning: Could not delete temp file {temp_path} for invalid mode: {e}")
-                return jsonify({'error': 'Invalid simulation mode specified'}), 400
-
-        except subprocess.TimeoutExpired as e:
-            if 'temp_path' in locals() and os.path.exists(temp_path):
-                try:
-                    os.unlink(temp_path)
-                except Exception as ex:
-                    print(f"Warning: Could not delete temp file {temp_path} after TimeoutExpired: {ex}")
-            print(f"Simulation startup timed out: {e}")
-            return jsonify({'error': f'Simulation startup timed out: {str(e)}'}), 500
-        except FileNotFoundError:
-            if 'temp_path' in locals() and os.path.exists(temp_path):
-                try:
-                    os.unlink(temp_path)
-                except Exception as e:
-                    print(f"Warning: Could not delete temp file {temp_path} after FileNotFoundError: {e}")
-            print(f"Simulator executable not found: {executable_path}")
-            return jsonify({'error': f'Simulator executable not found: {executable_path}'}), 500
-        except Exception as e:
-            if 'temp_path' in locals() and os.path.exists(temp_path):
-                try:
-                    os.unlink(temp_path)
-                except Exception as ex:
-                    print(f"Warning: Could not delete temp file {temp_path} after general exception: {ex}")
-            print(f"Error running simulator: {str(e)}")
-            return jsonify({'error': f'Error running simulator: {str(e)}'}), 500
+        return '\n'.join(output_lines), 200, {'Content-Type': 'text/plain'}
 
     except Exception as e:
-        print(f"Top-level server error: {str(e)}")
-        return jsonify({'error': f'Server error: {str(e)}'}), 500
+        return f"❌ Error: {str(e)}", 500
 
-@app.route('/step_simulation', methods=['POST'])
-def step_simulation():
-    data = request.get_json()
-    process_id = data.get('process_id')
-    command = data.get('command', '\n')
-
-    if process_id is None:
-        return jsonify({'error': 'process_id is required'}), 400
-
-    simulation_info = active_simulations.get(process_id)
-    if not simulation_info:
-        # Check if it terminated recently and clean up temp_path if still exists
-        if 'temp_path' in data:
-            temp_path_from_client = data['temp_path']
-            if os.path.exists(temp_path_from_client):
-                try:
-                    os.unlink(temp_path_from_client)
-                    print(f"Cleaned up stray temp file: {temp_path_from_client}")
-                except Exception as e:
-                    print(f"Warning: Failed to clean up stray temp file {temp_path_from_client}: {e}")
-
-        return jsonify({'error': 'Simulation process not found or has ended. Please start a new simulation.'}), 404
-
-    process = simulation_info['process']
-    temp_path = simulation_info['temp_path']
-
+@app.route('/simulate-interactive', methods=['POST'])
+def simulate_interactive():
+    """Start interactive simulation"""
     try:
-        # Check if process has already terminated before sending command
-        if process.poll() is not None:
-            print(f"Process {process_id} already terminated before step request.")
-            try:
-                os.unlink(temp_path)
-            except Exception as e:
-                print(f"Warning: Could not delete temp file {temp_path} during pre-step cleanup: {e}")
-            if process_id in active_simulations:
-                del active_simulations[process_id]
-            return jsonify({
-                'status': 'Simulation finished',
-                'output': 'Simulation ended unexpectedly.',
-                'terminated': True,
-                'step_count': simulation_info['step_count']
-            }), 200
+        if 'binfile' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
 
-        print(f"Sending command to process {process_id}: {repr(command.strip())}")
-        process.stdin.write(command) # `command` already includes `\n` from frontend
-        process.stdin.flush()
+        file = request.files['binfile']
 
-        # Read output until we see "READY_FOR_STEP" or process terminates
-        output_lines, ready_marker_found = read_until_ready(process, timeout=10) # Adjust timeout if steps are slow
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
 
-        filtered_output = [line for line in output_lines if line != "READY_FOR_STEP"]
-        current_output = "\n".join(filtered_output)
+        # Save uploaded file
+        timestamp = str(int(time.time()))
+        filename = f"{timestamp}_{file.filename}"
+        filepath = os.path.join('uploads', filename)
 
-        simulation_info['step_count'] += 1
+        os.makedirs('uploads', exist_ok=True)
+        file.save(filepath)
 
-        # Check if process terminated *after* this step
-        if process.poll() is not None:
-            print(f"Process {process_id} terminated after step. Return code: {process.returncode}")
-            try:
-                os.unlink(temp_path)
-            except Exception as e:
-                print(f"Warning: Could not delete temp file {temp_path} during post-step cleanup: {e}")
-            if process_id in active_simulations:
-                del active_simulations[process_id]
+        # Create interactive simulation session
+        session_id = simulator_manager.create_session(filepath, interactive=True)
 
-            stderr_output = ""
-            try:
-                stderr_output = process.stderr.read()
-            except:
-                pass
-            if stderr_output.strip():
-                current_output += f"\n\n[Simulator Stderr]:\n{stderr_output.strip()}"
+        # Start simulation
+        success, message = simulator_manager.start_simulation(session_id)
 
-            return jsonify({
-                'status': 'Simulation step executed',
-                'output': current_output,
-                'terminated': True,
-                'return_code': process.returncode,
-                'step_count': simulation_info['step_count']
-            }), 200
-        else:
-            if not ready_marker_found:
-                print(f"Warning: Process {process_id} did not send READY_FOR_STEP after step. Current output: {current_output}")
-                # Force termination to prevent hanging
-                process.terminate()
-                try:
-                    process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                try:
-                    os.unlink(temp_path)
-                except Exception as e:
-                    print(f"Warning: Could not delete temp file {temp_path} during hang cleanup: {e}")
-                if process_id in active_simulations:
-                    del active_simulations[process_id]
-                return jsonify({
-                    'error': f'Simulator did not signal readiness after step {simulation_info["step_count"]}. Possible hang. Process terminated. Last output: {current_output}',
-                    'output': current_output,
-                    'terminated': True,
-                    'step_count': simulation_info['step_count']
-                }), 500
+        if not success:
+            return jsonify({"error": message}), 500
 
-            return jsonify({
-                'status': 'Simulation step executed',
-                'output': current_output,
-                'terminated': False,
-                'step_count': simulation_info['step_count']
-            }), 200
-
-    except Exception as e:
-        print(f"Error during step simulation for process {process_id}: {e}")
-        if process_id in active_simulations:
-            sim_info_to_clean = active_simulations[process_id]
-            try:
-                proc_to_clean = sim_info_to_clean['process']
-                tmp_path_to_clean = sim_info_to_clean['temp_path']
-                if proc_to_clean.poll() is None:
-                    try:
-                        proc_to_clean.terminate()
-                        proc_to_clean.wait(timeout=2)
-                    except subprocess.TimeoutExpired:
-                        proc_to_clean.kill()
-                if os.path.exists(tmp_path_to_clean):
-                    os.unlink(tmp_path_to_clean)
-                del active_simulations[process_id]
-            except Exception as clean_err:
-                print(f"Error during cleanup after step error for {process_id}: {clean_err}")
-        return jsonify({'error': f'Error during step simulation: {str(e)}'}), 500
-
-@app.route('/end_simulation', methods=['POST'])
-def end_simulation():
-    data = request.get_json()
-    process_id = data.get('process_id')
-
-    if process_id is None:
-        return jsonify({'error': 'process_id is required'}), 400
-
-    simulation_info = active_simulations.get(process_id)
-    if not simulation_info:
-        return jsonify({'status': 'Simulation already ended or not found'}), 200
-
-    process = simulation_info['process']
-    temp_path = simulation_info['temp_path']
-
-    try:
-        if process.poll() is None:
-            print(f"Sending 'q' to terminate process {process_id}")
-            try:
-                process.stdin.write('q\n')
-                process.stdin.flush()
-            except BrokenPipeError:
-                print(f"Stdin pipe for process {process_id} already closed, likely terminated.")
-            except Exception as e:
-                print(f"Error writing 'q' to process {process_id}: {e}")
-                pass
-
-            try:
-                process.wait(timeout=3)
-                print(f"Process {process_id} terminated gracefully.")
-            except subprocess.TimeoutExpired:
-                print(f"Process {process_id} did not terminate gracefully, killing it.")
-                process.terminate()
-                try:
-                    process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                except Exception as e:
-                    print(f"Error killing process {process_id}: {e}")
-            except Exception as e:
-                print(f"Error waiting for process {process_id} termination: {e}")
-
+        # Wait for initial READY signal
+        session = simulator_manager.active_sessions[session_id]
         try:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
-                print(f"Cleaned up temp file: {temp_path}")
-        except Exception as e:
-            print(f"Warning: Could not delete temp file {temp_path} during end_simulation: {e}")
+            session['queue'].get(timeout=10)
+        except queue.Empty:
+            return jsonify({"error": "Timeout waiting for simulator to start"}), 500
 
-        if process_id in active_simulations:
-            del active_simulations[process_id]
-            print(f"Removed process {process_id} from active simulations.")
+        # Initial graphics capture
+        simulator_manager._capture_graphics_state(session_id)
 
-        return jsonify({'status': 'Simulation ended successfully'}), 200
+        return jsonify({
+            "session_id": session_id,
+            "status": "started",
+            "message": "Interactive simulation ready",
+            "graphics_enabled": True
+        })
 
     except Exception as e:
-        print(f"Error ending simulation {process_id}: {e}")
-        if process_id in active_simulations:
-            sim_info_to_clean = active_simulations[process_id]
-            try:
-                proc_to_clean = sim_info_to_clean['process']
-                tmp_path_to_clean = sim_info_to_clean['temp_path']
-                if proc_to_clean.poll() is None:
-                    try:
-                        proc_to_clean.terminate()
-                        proc_to_clean.wait(timeout=2)
-                    except:
-                        proc_to_clean.kill()
-                if os.path.exists(tmp_path_to_clean):
-                    os.unlink(tmp_path_to_clean)
-                del active_simulations[process_id]
-            except Exception as clean_err:
-                print(f"Error during cleanup after end_simulation error for {process_id}: {clean_err}")
-        return jsonify({'error': f'Error ending simulation: {str(e)}'}), 500
+        return jsonify({"error": str(e)}), 500
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    executable_path, exec_message = check_executable()
-    cpp_exists = os.path.exists('z16sim.cpp')
-    compiler_available = check_compiler()
+@app.route('/step/<session_id>', methods=['POST'])
+def step(session_id):
+    """Execute one simulation step"""
+    success, message = simulator_manager.step_simulation(session_id)
+
+    if not success:
+        return jsonify({"error": message}), 400
+
+    output = simulator_manager.get_full_output(session_id)
+    graphics_data = simulator_manager.get_graphics_data(session_id)
 
     return jsonify({
-        'status': 'Backend is running',
-        'message': 'ZX16 Simulator Backend',
-        'executable_found': executable_path is not None,
-        'executable_path': executable_path if executable_path else 'Not found',
-        'executable_message': exec_message,
-        'cpp_source_found': cpp_exists,
-        'active_simulations': len(active_simulations),
-        'compiler_available': compiler_available
+        "status": "success" if success else "error",
+        "message": message,
+        "output": output,
+        "graphics": graphics_data
     })
 
-@app.route('/status', methods=['GET'])
-def get_status():
-    executable_path, message = check_executable()
-    return jsonify({
-        'active_simulations': len(active_simulations),
-        'process_ids': list(active_simulations.keys()),
-        'executable_found': executable_path is not None,
-        'executable_message': message,
-        'cpp_source_found': os.path.exists('z16sim.cpp'),
-        'compiler_available': check_compiler()
-    })
+@app.route('/graphics/<session_id>', methods=['GET'])
+def get_graphics(session_id):
+    """Get current graphics state"""
+    graphics_data = simulator_manager.get_graphics_data(session_id)
 
-@app.route('/files', methods=['GET'])
-def list_files():
-    files = []
-    for file_name in os.listdir('.'):
-        if file_name.endswith(('.cpp', '.exe', '.bin')) or file_name == 'z16sim':
-            try:
-                stat = os.stat(file_name)
-                files.append({
-                    'name': file_name,
-                    'size': stat.st_size,
-                    'modified': stat.st_mtime
-                })
-            except Exception as e:
-                print(f"Error stating file {file_name}: {e}")
-                pass
-    return jsonify({'files': files})
+    if not graphics_data:
+        return jsonify({"error": "No graphics data available"}), 404
+
+    return jsonify(graphics_data)
 
 if __name__ == '__main__':
-    print("🚀 Starting ZX16 Simulator Backend...")
-    print("📁 Looking for z16sim.cpp source file...")
-
-    cpp_exists = os.path.exists('z16sim.cpp')
-    executable_path, message = check_executable()
-
-    if cpp_exists:
-        print(f"✅ Found z16sim.cpp")
-        if executable_path:
-            print(f"✅ {message}")
-        else:
-            print(f"⚠️  {message}")
-            print("🔨 Will attempt to compile when needed")
-    else:
-        print("❌ z16sim.cpp not found in current directory")
-        print("📂 Please ensure z16sim.cpp is in the same directory as this script")
-
-    if check_compiler():
-        print("✅ g++ compiler found")
-    else:
-        print("❌ g++ compiler not found - compilation will not be possible")
-
-    print("🌐 Backend will run on http://localhost:5001")
-    # Set use_reloader to False to avoid double execution on some systems
-    app.run(debug=True, host='0.0.0.0', port=5001, use_reloader=False)
+    print("Starting Z16 Simulator Backend with Graphics Support...")
+    print("Frontend should connect to: http://localhost:5001")
+    app.run(host='0.0.0.0', port=5001, debug=True)

@@ -1,0 +1,7 @@
+some arithmatic operations
+
+    add x3, x2
+    sub x4, x2
+    mv  x5, x4
+    clr x6
+    addi x6, 1

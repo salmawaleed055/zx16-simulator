@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
-<!-- Written by QtCreator 13.0.2, 2025-07-09T16:29:20. -->
+<!-- Written by QtCreator 13.0.0, 2025-07-14T03:30:37. -->
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
-  <value type="QByteArray">{3b64efeb-798b-4397-afd9-1ee2d29304ca}</value>
+  <value type="QByteArray">{15004b33-d423-4708-956b-255382493cbc}</value>
  </data>
  <data>
   <variable>ProjectExplorer.Project.ActiveTarget</variable>
@@ -76,7 +76,7 @@
     <value type="bool" key="ClangTools.AnalyzeOpenFiles">true</value>
     <value type="bool" key="ClangTools.BuildBeforeAnalysis">true</value>
     <value type="QString" key="ClangTools.DiagnosticConfig">Builtin.DefaultTidyAndClazy</value>
-    <value type="int" key="ClangTools.ParallelJobs">6</value>
+    <value type="int" key="ClangTools.ParallelJobs">4</value>
     <value type="bool" key="ClangTools.PreferConfigFile">true</value>
     <valuelist type="QVariantList" key="ClangTools.SelectedDirs"/>
     <valuelist type="QVariantList" key="ClangTools.SelectedFiles"/>
@@ -89,9 +89,9 @@
   <variable>ProjectExplorer.Project.Target.0</variable>
   <valuemap type="QVariantMap">
    <value type="QString" key="DeviceType">Desktop</value>
-   <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Desktop Qt 6.7.2 MinGW 64-bit</value>
-   <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">Desktop Qt 6.7.2 MinGW 64-bit</value>
-   <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">qt.qt6.672.win64_mingw_kit</value>
+   <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Qt 6.7.0 for macOS</value>
+   <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">Qt 6.7.0 for macOS</value>
+   <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">qt.qt6.670.clang_64_kit</value>
    <value type="qlonglong" key="ProjectExplorer.Target.ActiveBuildConfiguration">0</value>
    <value type="qlonglong" key="ProjectExplorer.Target.ActiveDeployConfiguration">0</value>
    <value type="qlonglong" key="ProjectExplorer.Target.ActiveRunConfiguration">0</value>
@@ -107,9 +107,10 @@
 -DCMAKE_PREFIX_PATH:PATH=%{Qt:QT_INSTALL_PREFIX}
 -DCMAKE_C_COMPILER:FILEPATH=%{Compiler:Executable:C}
 -DCMAKE_CXX_COMPILER:FILEPATH=%{Compiler:Executable:Cxx}
--DCMAKE_CXX_FLAGS_INIT:STRING=%{Qt:QML_DEBUG_FLAG}</value>
+-DCMAKE_CXX_FLAGS_INIT:STRING=%{Qt:QML_DEBUG_FLAG}
+</value>
     <value type="int" key="EnableQmlDebugging">0</value>
-    <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">D:\QT\Z16\build\Desktop_Qt_6_7_2_MinGW_64_bit-Debug</value>
+    <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">/Users/mac/Documents/GitHub/zx16-simulator/Graphics_QT/build/Qt_6_7_0_for_macOS-Debug</value>
     <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
      <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
       <value type="QString" key="CMakeProjectManager.MakeStep.BuildPreset"></value>
@@ -164,8 +165,9 @@
 -DCMAKE_PREFIX_PATH:PATH=%{Qt:QT_INSTALL_PREFIX}
 -DCMAKE_C_COMPILER:FILEPATH=%{Compiler:Executable:C}
 -DCMAKE_CXX_COMPILER:FILEPATH=%{Compiler:Executable:Cxx}
--DCMAKE_CXX_FLAGS_INIT:STRING=%{Qt:QML_DEBUG_FLAG}</value>
-    <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">D:\QT\Z16\build\Desktop_Qt_6_7_2_MinGW_64_bit-Release</value>
+-DCMAKE_CXX_FLAGS_INIT:STRING=%{Qt:QML_DEBUG_FLAG}
+%{CMAKE_OSX_ARCHITECTURES:DefaultFlag}</value>
+    <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">/Users/mac/Documents/GitHub/zx16-simulator/Graphics_QT/build/Qt_6_7_0_for_macOS-Release</value>
     <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
      <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
       <value type="QString" key="CMakeProjectManager.MakeStep.BuildPreset"></value>
@@ -218,8 +220,9 @@
 -DCMAKE_PREFIX_PATH:PATH=%{Qt:QT_INSTALL_PREFIX}
 -DCMAKE_C_COMPILER:FILEPATH=%{Compiler:Executable:C}
 -DCMAKE_CXX_COMPILER:FILEPATH=%{Compiler:Executable:Cxx}
--DCMAKE_CXX_FLAGS_INIT:STRING=%{Qt:QML_DEBUG_FLAG}</value>
-    <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">D:\QT\Z16\build\Desktop_Qt_6_7_2_MinGW_64_bit-RelWithDebInfo</value>
+-DCMAKE_CXX_FLAGS_INIT:STRING=%{Qt:QML_DEBUG_FLAG}
+%{CMAKE_OSX_ARCHITECTURES:DefaultFlag}</value>
+    <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">/Users/mac/Documents/GitHub/zx16-simulator/Graphics_QT/build/Qt_6_7_0_for_macOS-RelWithDebInfo</value>
     <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
      <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
       <value type="QString" key="CMakeProjectManager.MakeStep.BuildPreset"></value>
@@ -272,9 +275,10 @@
 -DCMAKE_PREFIX_PATH:PATH=%{Qt:QT_INSTALL_PREFIX}
 -DCMAKE_C_COMPILER:FILEPATH=%{Compiler:Executable:C}
 -DCMAKE_CXX_COMPILER:FILEPATH=%{Compiler:Executable:Cxx}
--DCMAKE_CXX_FLAGS_INIT:STRING=%{Qt:QML_DEBUG_FLAG}</value>
+-DCMAKE_CXX_FLAGS_INIT:STRING=%{Qt:QML_DEBUG_FLAG}
+%{CMAKE_OSX_ARCHITECTURES:DefaultFlag}</value>
     <value type="int" key="EnableQmlDebugging">0</value>
-    <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">D:\QT\Z16\build\Desktop_Qt_6_7_2_MinGW_64_bit-Profile</value>
+    <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">/Users/mac/Documents/GitHub/zx16-simulator/Graphics_QT/build/Qt_6_7_0_for_macOS-Profile</value>
     <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
      <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
       <value type="QString" key="CMakeProjectManager.MakeStep.BuildPreset"></value>
@@ -327,8 +331,9 @@
 -DCMAKE_PREFIX_PATH:PATH=%{Qt:QT_INSTALL_PREFIX}
 -DCMAKE_C_COMPILER:FILEPATH=%{Compiler:Executable:C}
 -DCMAKE_CXX_COMPILER:FILEPATH=%{Compiler:Executable:Cxx}
--DCMAKE_CXX_FLAGS_INIT:STRING=%{Qt:QML_DEBUG_FLAG}</value>
-    <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">D:\QT\Z16\build\Desktop_Qt_6_7_2_MinGW_64_bit-MinSizeRel</value>
+-DCMAKE_CXX_FLAGS_INIT:STRING=%{Qt:QML_DEBUG_FLAG}
+%{CMAKE_OSX_ARCHITECTURES:DefaultFlag}</value>
+    <value type="QString" key="ProjectExplorer.BuildConfiguration.BuildDirectory">/Users/mac/Documents/GitHub/zx16-simulator/Graphics_QT/build/Qt_6_7_0_for_macOS-MinSizeRel</value>
     <valuemap type="QVariantMap" key="ProjectExplorer.BuildConfiguration.BuildStepList.0">
      <valuemap type="QVariantMap" key="ProjectExplorer.BuildStepList.Step.0">
       <value type="QString" key="CMakeProjectManager.MakeStep.BuildPreset"></value>
@@ -392,7 +397,7 @@
     <value type="int" key="PE.EnvironmentAspect.Base">2</value>
     <valuelist type="QVariantList" key="PE.EnvironmentAspect.Changes"/>
     <value type="bool" key="PE.EnvironmentAspect.PrintOnRun">false</value>
-    <value type="QString" key="PerfRecordArgsId">-e cpu-cycles --call-graph &quot;dwarf,4096&quot; -F 250</value>
+    <value type="QString" key="PerfRecordArgsId">-e cpu-cycles --call-graph dwarf,4096 -F 250</value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">Z16</value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">CMakeProjectManager.CMakeRunConfiguration.Z16</value>
     <value type="QString" key="ProjectExplorer.RunConfiguration.BuildKey">Z16</value>
@@ -400,7 +405,7 @@
     <value type="bool" key="RunConfiguration.UseCppDebuggerAuto">true</value>
     <value type="bool" key="RunConfiguration.UseLibrarySearchPath">true</value>
     <value type="bool" key="RunConfiguration.UseQmlDebuggerAuto">true</value>
-    <value type="QString" key="RunConfiguration.WorkingDirectory.default">D:/QT/Z16/build/Desktop_Qt_6_7_2_MinGW_64_bit-Debug</value>
+    <value type="QString" key="RunConfiguration.WorkingDirectory.default">/Users/mac/Documents/GitHub/zx16-simulator/Graphics_QT/build/Qt_6_7_0_for_macOS-Debug/Z16.app/Contents/MacOS</value>
    </valuemap>
    <value type="qlonglong" key="ProjectExplorer.Target.RunConfigurationCount">1</value>
   </valuemap>
