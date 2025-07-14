@@ -11,19 +11,6 @@ A custom RISC-based CPU emulator supporting instruction execution, system calls,
 - [Testing Guidelines](#testing-guidelines)
 
 ## Features
-# ZX16 Instruction Set Simulator
-
-A custom RISC-based CPU emulator supporting instruction execution, system calls, memory operations, and basic audio functionality.
-
-## Table of Contents
-- [Features](#features)
-- [Build Instructions](#build-instructions)
-- [Usage Guidelines](#usage-guidelines)
-- [Design Overview](#design-overview)
-- [Project Challenges & Limitations](#project-challenges--limitations)
-- [Testing Guidelines](#testing-guidelines)
-
-## Features
 - 8 General-Purpose Registers (x0-x7)
   - Aliases: t0, ra, sp, s0, s1, t1, a0, a1
 - 64KB Addressable Memory
@@ -188,16 +175,3 @@ li x7, 1000        # 1 second
 ecall 4             # SYS_TONE
 ```
 [Full test case](tests/ecall_test.s)
-
-
-For questions or contributions, please open an issue in the repository.
-```
-
-This README.md:
-1. Integrates all your test cases in appropriate sections
-2. Maintains clear organization with headers and code blocks
-3. Shows both the architecture overview and specific test examples
-4. Includes build/usage instructions
-5. Highlights limitations and features
-
-The markdown formatting ensures proper rendering on GitHub/GitLab while keeping the test cases clearly visible and properly formatted.
