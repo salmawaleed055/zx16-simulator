@@ -1,21 +1,20 @@
+.org 0x0020
+.text
+
 main:
-    # === Setup Color Palette ===
        LUI x3, 500       # 0xFA00
        LI x4, 0          # Black
        SB x4, 0(x3)      # palette[0] = black
-       LI x4, -1         # White (0xFF)
+       LI x4, 0x03      
        SB x4, 1(x3)      # palette[1] = white
 
-       # === Create White Block Tile (Tile 1) ===
        LUI x3, 484       # 0xF200
        ADDI x3, 63       # Skip to tile 1
        ADDI x3, 63
-       ADDI x3, 2        # Now at 0xF280 (tile 1)
+       ADDI x3, 2       
 
-       # Fill tile 1 with white pixels (simplified approach like original working code)
-       LI x4, 17         # 0x11 = white pixels
+       LI x4, 17       
 
-       # Fill enough bytes to make tile visible (like the working white stripes)
        SB x4, 0(x3)
        SB x4, 1(x3)
        SB x4, 2(x3)
@@ -263,13 +262,10 @@ main:
        SB x4, 7(x3)
 
 
-       # === Clear screen and place white tiles directly ===
        LUI x3, 480       # 0xF000 (tile map)
-       LI x4, 1          # White tile (tile 1)
+       LI x4, 1        
 
-       # Create visible pattern by placing white tiles
-       # First, clear some area
-       LI x5, 0          # Black tile
+       LI x5, 0         
        SB x5, 0(x3)
        SB x5, 1(x3)
        SB x5, 2(x3)
@@ -279,7 +275,6 @@ main:
        SB x5, 6(x3)
        SB x5, 7(x3)
 
-       # Move to next row
        ADDI x3, 20
        SB x5, 0(x3)
        SB x5, 1(x3)
@@ -291,7 +286,6 @@ main:
        SB x5, 7(x3)
 
 
-    # === Initialize game variables ===
     # x0 = ball X position
     # x1 = ball Y position
     # x7 = collision flag (0 = no collision, 1 = paddle hit, 2 = frame hit)
@@ -301,18 +295,13 @@ main:
     LI x7, 0          # No collision initially
 
 
-
-
-# === NOW SHOW PADDLES ON CLEAR SCREEN ===
-
-    LI x4, 1          # White tile
+    LI x4, 1      
 
     # LEFT PADDLE - Column 0, Rows 3-8 (6 tiles tall)
     LUI x3, 480       # Reset to tile map
     ADDI x3, 60       # Row 3: 3*20 = 60
-    ADDI x3, 0        # Column 0 (leftmost)
+    ADDI x3, 0        # 
 
-    # Draw left paddle (6 tiles vertical)
     SB x4, 0(x3)      # Row 3
     ADDI x3, 20       # Next row
     SB x4, 0(x3)      # Row 4
@@ -325,12 +314,10 @@ main:
     ADDI x3, 20       # Next row
     SB x4, 0(x3)      # Row 8
 
-    # RIGHT PADDLE - Column 19, Rows 3-8 (6 tiles tall)
     LUI x3, 480       # Reset to tile map
     ADDI x3, 60       # Row 3: 3*20 = 60
-    ADDI x3, 19       # Column 19 (rightmost)
+    ADDI x3, 19       
 
-    # Draw right paddle (6 tiles vertical)
     SB x4, 0(x3)      # Row 3
     ADDI x3, 20       # Next row
     SB x4, 0(x3)      # Row 4
@@ -344,31 +331,20 @@ main:
     SB x4, 0(x3)      # Row 8
 
 
-    LI x4, 0          # Black tile
+    LI x4, 0          
 
 game_input_loop:
-    # === Check for keyboard input ===
     ECALL 7           # Read keyboard - key in x6 (a0), pressed flag in x7 (a1)
 
-    # Check if a key was pressed
-    # CHANGE THIS:
-    # BZ x7, continue_game    # This branch is too far
-    # TO THIS:
     BNZ x7, check_keys      # Short branch to nearby code
     J continue_game         # Jump to distant target
 
 check_keys:
-    # Check for right paddle controls
-    LI x5, 111        # ASCII code for 'o' (move up)
-    # CHANGE THIS:
-    # BEQ x6, x5, move_right_paddle_up    # This branch is too far
-    # TO THIS:
+    LI x5, 111        
     BEQ x6, x5, do_move_up              # Short branch to nearby jump
 
-    LI x5, 108        # ASCII code for 'l' (move down)
-    # CHANGE THIS:
-    # BEQ x6, x5, move_right_paddle_down  # This branch is too far
-    # TO THIS:
+    LI x5, 108        
+
     BEQ x6, x5, do_move_down            # Short branch to nearby jump
 
     J continue_game   # If not our keys, continue
@@ -380,37 +356,25 @@ do_move_down:
     J move_right_paddle_down  # Jump to the actual movement code
 
 move_right_paddle_up:
-    # Check if paddle can move up (top row > 0)
-    # CHANGE THIS:
-    # BZ x2, continue_game   # This branch is too far
-    # TO THIS:
-    BNZ x2, can_move_up     # Short branch
-    J continue_game         # Jump to distant target
+    BNZ x2, can_move_up     
+    J continue_game         
 
 can_move_up:
-    # [Rest of your paddle movement code stays the same]
 
-    J continue_game    # Jump back instead of falling through
+    J continue_game    
 
 move_right_paddle_down:
-    # Check if paddle can move down (bottom row < 9)
-    # Paddle is 6 tiles tall, so bottom row = top row + 5
     MV x5, x2         # Copy paddle position
     ADDI x5, 5        # Calculate bottom row
     LI x6, 9          # Maximum bottom row
-    # CHANGE THIS:
-    # BGE x5, x6, continue_game  # This branch is too far
-    # TO THIS:
     BLT x5, x6, can_move_down   # Short branch (opposite condition)
     J continue_game             # Jump to distant target
 
 can_move_down:
-    # [Rest of your paddle movement code stays the same]
 
     J continue_game    # Jump back instead of falling through
 
 
-    # Clear old paddle position
     LUI x3, 480       # Reset to tile map
     MV x5, x2         # Get current paddle Y position
     SLLI x5, 4        # y * 16
@@ -422,7 +386,6 @@ can_move_down:
 
     LI x4, 0          # Black tile to clear
 
-    # Clear 6 tiles vertically at old position
     SB x4, 0(x3)      # Row 0
     ADDI x3, 20       # Next row
     SB x4, 0(x3)      # Row 1
@@ -435,7 +398,6 @@ can_move_down:
     ADDI x3, 20       # Next row
     SB x4, 0(x3)      # Row 5
 
-    # Move paddle up
     ADDI x2, -1
 
     # Draw new paddle position
@@ -1042,7 +1004,6 @@ end_demo:
      ADDI  x3, x3, 20        # next row
      SB    x4, 0(x3)
 
-     # Next row: row 5, col 15
      ADDI  x3, x3, 20        # next row
      SB    x4, 0(x3)
 
