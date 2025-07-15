@@ -4,7 +4,7 @@
 #include <SFML/Graphics.hpp>
 #include <cstdint>
 #include <iostream>
-#include <cstdio> 
+#include <cstdio>
 #include <cstring>
 #include "Memory.h"
 
@@ -44,10 +44,14 @@ public:
     bool needsGraphics() const;
     sf::RenderWindow window;
     sf::Sprite screenSprite;
+<<<<<<< HEAD
     void setNeedsUpdate();
 
     void onGraphicsMemoryWrite(uint16_t addr, uint8_t value);
     
+=======
+
+>>>>>>> origin/Final_front_end
 };
 
 

@@ -8,12 +8,21 @@ set(SFML_DIR "C:/Users/salma waleed/Downloads/SFML-2.5.1-windows-gcc-7.3.0-mingw
 
 # Find SFML
 find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
+<<<<<<< HEAD
 
 
 add_executable(z16sim
     z16sim.cpp
     graphics.cpp
     Memory.cpp
+=======
+
+add_executable(z16sim
+    z16sim.cpp
+        graphics.cpp
+        backend/z16sim.cpp
+        backend/graphics.cpp
+>>>>>>> origin/Final_front_end
 )
 
 target_link_libraries(z16sim PRIVATE 

@@ -161,13 +161,22 @@ function App() {
       return;
     }
 
+<<<<<<< HEAD
+=======
+    // Prepare form data to send the file and mode to the backend
+>>>>>>> origin/Final_front_end
     const formData = new FormData();
     formData.append('binfile', selectedFile);
     formData.append('mode', mode);
 
     setLoading(true);
+<<<<<<< HEAD
     setSimOutput('');
     showUserMessage(`⏳ Starting ${mode} simulation...`, 'info', 0);
+=======
+    setSimOutput(''); // Clear previous output
+    showUserMessage(`⏳ Starting ${mode} simulation...`, 'info', 0); // Persistent during simulation start
+>>>>>>> origin/Final_front_end
     setHasSimulationEnded(false);
     setStepCount(0);
 
@@ -178,6 +187,7 @@ function App() {
       });
 
       if (!response.ok) {
+<<<<<<< HEAD
         // Handle different content types for error responses
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
@@ -198,15 +208,41 @@ function App() {
         const result = await response.json();
         setProcessId(result.process_id);
         setIsStepping(true);
+=======
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Server error: ${response.statusText}`);
+      }
+
+      if (mode === 'full') {
+        const result = await response.text(); // Full simulation returns plain text
+        setSimOutput(result);
+        showUserMessage("✅ Full simulation completed.", 'success');
+        setHasSimulationEnded(true);
+      } else if (mode === 'step') {
+        const result = await response.json(); // Step-by-step returns JSON
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        setProcessId(result.process_id);
+        setIsStepping(true);
+        // Display initial output and process ID
+>>>>>>> origin/Final_front_end
         setSimOutput(`🚶 Step-by-step simulation started (Process ID: ${result.process_id})\n\n${result.initial_output}`);
         showUserMessage("🎯 Ready for step-by-step execution. Click 'Next Step' to proceed.", 'info');
       }
 
+<<<<<<< HEAD
       setHasSimulationEnded(true);
+=======
+>>>>>>> origin/Final_front_end
     } catch (error) {
       console.error('Simulation error:', error);
       setSimOutput(`❌ Error: ${error.message}`);
       showUserMessage(`❌ Simulation failed: ${error.message}`, 'error');
+<<<<<<< HEAD
+=======
+      // Reset states on error
+>>>>>>> origin/Final_front_end
       setProcessId(null);
       setIsStepping(false);
       setHasSimulationEnded(true);
